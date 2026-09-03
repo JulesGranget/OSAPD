@@ -31,7 +31,7 @@ def epoch_ERP_wb(sujet):
     #### load
     data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet)
     # respfeatures = get_respfeatures(sujet)
-    chanlist, localist = get_locachanlist(sujet)
+    chanlist, localist = get_chanlocalist(sujet)
 
     #### precompute OC
     #cond = conditions_oc[0]
@@ -104,7 +104,7 @@ def epoch_ERP_wb(sujet):
         print(f'SAVE ERP {sujet} {cond}', flush=True)
 
         time_vec_epoch = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
-        dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca'].values), 'epoch' : np.arange(erp_cond.shape[1]), 'time' : time_vec_epoch} 
+        dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'epoch' : np.arange(erp_cond.shape[1]), 'time' : time_vec_epoch} 
         xr_erp_export = xr.DataArray(erp_cond, dims=("chan", "epoch", "time"), coords=dict_xr_erp_coords)
 
         xr_erp_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_{cond}_WB_erp.nc"))
@@ -179,7 +179,7 @@ def epoch_ERP_wb(sujet):
     print(f'SAVE ERP {sujet} {cond}', flush=True)
 
     time_vec_epoch = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
-    dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca'].values), 'epoch' : np.arange(erp_cond.shape[1]), 'time' : time_vec_epoch} 
+    dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'epoch' : np.arange(erp_cond.shape[1]), 'time' : time_vec_epoch} 
     xr_erp_export = xr.DataArray(erp_cond, dims=("chan", "epoch", "time"), coords=dict_xr_erp_coords)
 
     xr_erp_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_RB_WB_erp.nc"))
@@ -196,7 +196,7 @@ def epoch_ERP_HFA(sujet):
 
     #### load
     data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet)
-    chanlist, localist = get_locachanlist(sujet)
+    chanlist, localist = get_chanlocalist(sujet)
 
     for cond in conditions_oc:
 
@@ -294,7 +294,7 @@ def epoch_ERP_HFA(sujet):
 
         time_vec_epoch = np.arange(-chunk_time_prepost, chunk_time_prepost, 1 / srate)
 
-        dict_xr_hfa_coords = {'chan': chanlist, 'loca': ('chan', localist['loca'].values), 'epoch': np.arange(hfa_cond.shape[1]), 'time': time_vec_epoch}
+        dict_xr_hfa_coords = {'chan': chanlist, 'loca': ('chan', localist['loca_modified'].values), 'epoch': np.arange(hfa_cond.shape[1]), 'time': time_vec_epoch}
 
         xr_hfa_export = xr.DataArray(hfa_cond, dims=("chan", "epoch", "time"), coords=dict_xr_hfa_coords)
 
@@ -401,7 +401,7 @@ def epoch_ERP_HFA(sujet):
 
     time_vec_epoch = np.arange(-chunk_time_prepost, chunk_time_prepost, 1 / srate)
 
-    dict_xr_hfa_coords = {'chan': chanlist, 'loca': ('chan', localist['loca'].values), 'epoch': np.arange(hfa_cond.shape[1]), 'time': time_vec_epoch}
+    dict_xr_hfa_coords = {'chan': chanlist, 'loca': ('chan', localist['loca_modified'].values), 'epoch': np.arange(hfa_cond.shape[1]), 'time': time_vec_epoch}
 
     xr_hfa_export = xr.DataArray(hfa_cond, dims=("chan", "epoch", "time"), coords=dict_xr_hfa_coords)
 
@@ -429,7 +429,7 @@ def get_perm_stats_wb(sujet):
     ######## CONFIG ########
     path_load_ERP = os.path.join(path_precompute, 'ERP', sujet)
 
-    chanlist, localist = get_locachanlist(sujet)
+    chanlist, localist = get_chanlocalist(sujet)
     conditions_sel = conditions_oc
     time_vec = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
 
@@ -490,7 +490,7 @@ def get_perm_stats_HFA(sujet):
     ######## CONFIG ########
     path_load_ERP = os.path.join(path_precompute, 'ERP', sujet)
 
-    chanlist, localist = get_locachanlist(sujet)
+    chanlist, localist = get_chanlocalist(sujet)
     conditions_sel = conditions_oc
     time_vec = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
 

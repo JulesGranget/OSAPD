@@ -74,11 +74,11 @@ prep_step_wb = {
 'high_pass' : {'execute': True, 'params' : {'l_freq' : 0.1, 'h_freq': None}},
 'low_pass' : {'execute': True, 'params' : {'l_freq' : None, 'h_freq': 200}},
 'csd_computation' : {'execute': False},
-'ICA_computation' : {'execute': True},
+'ICA_computation' : {'execute': False},
 'average_reref' : {'execute': False},
 }
 
-
+bipolarize_chan_i_lim = 8 #non zero based
 
 
 ################################

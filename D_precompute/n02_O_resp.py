@@ -97,7 +97,7 @@ def extract_ERP_resp(sujet):
     data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet)
 
     #### precompute
-    #cond = conditions_oc[1]
+    #cond = conditions_oc[0]
     for cond in conditions_oc:
 
         if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_{cond}_ERP_resp.nc")):
@@ -130,15 +130,12 @@ def extract_ERP_resp(sujet):
 
             for epoch_i, epoch_trig in enumerate(oc_list_trial):
 
-                _start, _stop = epoch_trig - chunk_time_prepost, epoch_trig + chunk_time_prepost
+                _start, _stop = int(epoch_trig*srate) - int(chunk_time_prepost*srate), int(epoch_trig*srate) + int(chunk_time_prepost*srate)
 
-                if _start < 0 or time_vec_trial[-1] < _stop:
+                if _start < 0 or time_vec_trial.shape[0] < _stop:
                     continue
 
-                else:
-                    time_vec_sel = (_start < time_vec_trial) & (time_vec_trial < _stop)
-
-                epoch_trial.append(data_ieeg_norm[time_vec_sel])
+                epoch_trial.append(data_ieeg_norm[_start:_stop])
 
             epoch_trial = np.stack(epoch_trial)
             erp_cond.append(epoch_trial)
@@ -244,7 +241,7 @@ def extract_mean_figures_stretch(sujet):
     #### export mean fig
     fig_mean, axs = plt.subplots(nrows=2, ncols=2, figsize=(10,8))
 
-    oc_id_sel = {'RB' : [0,1], 'O' : [2]}
+    oc_id_sel = {'RB' : [0], 'O' : [2]}
     
     for col_i, cond_cycle in enumerate(conditions_cycle):
 
@@ -307,7 +304,7 @@ def extract_mean_figures_stretch(sujet):
 
 if __name__ == '__main__':
 
-    #sujet = 'LH018'
+    #sujet = sujet_list[0]
     for sujet in sujet_list:
 
         extract_stretch_resp(sujet)

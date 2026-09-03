@@ -154,11 +154,13 @@ def load_trial_data_sujet(sujet, trial):
 
 
 
-def get_locachanlist(sujet):
+def get_chanlocalist(sujet):
 
-    path_load_loca = os.path.join(path_prep, 'anatomy', sujet, f"{sujet}_plot_loca.xlsx")
-    localist = pd.read_excel(path_load_loca)
-    chanlist = localist['chan'].values
+    path_load_loca = os.path.join(path_prep, 'anatomy', sujet, f"{sujet}_locafile.xlsx")
+    df_localist_raw = pd.read_excel(path_load_loca)
+    df_localist_sel = df_localist_raw.query(f"select == 1")
+    localist = df_localist_sel
+    chanlist = df_localist_sel['chan'].values
 
     return chanlist, localist
 

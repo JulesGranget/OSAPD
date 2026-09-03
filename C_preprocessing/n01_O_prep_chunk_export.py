@@ -98,7 +98,7 @@ def sync_resp_ieeg(resp, ieeg, resp_trig, ieeg_trig, resp_srate, ieeg_srate, tar
 
 
 #sujet = sujet_list[0]
-def extract_data(sujet):
+def extract_data(sujet, bipolar_extraction):
 
     #### config
     path_data_raw = os.path.join(path_data, sujet, 'neural')
@@ -151,7 +151,7 @@ def extract_data(sujet):
     oc_trigger_alltrial = []
     respfeature_alltrial = []
 
-    #trial_i, trial_cond = 3, trial_list_dict[sujet][3]
+    #trial_i, trial_cond = 0, trial_list_dict[sujet][1]
     for trial_i, trial_cond in enumerate(trial_list_dict[sujet]):
         
         filename = [_file for _file in os.listdir(path_data_raw) if _file[:2] == f"0{trial_i+1}"][0]
@@ -376,7 +376,7 @@ def extract_data(sujet):
 
                 if (trigger_cycle < row_val['expi_time']).any():
                     _oc_id = 2
-                    oc_trigger.append(trigger_cycle[0])
+                    oc_trigger.append(cycle_start)
 
                 if 4 < trigger_cycle.size:
                     raise ValueError('!!! error in cycle trig number !!!')                    
@@ -399,8 +399,8 @@ def extract_data(sujet):
         #### verify OC trigger
         if debug:
 
-            plt.plot(time_vec_resp, resp_clean)
-            plt.vlines(oc_trigger, ymin=resp_clean.min(), ymax=resp_clean.max(), color='r')
+            plt.plot(time_vec_resp, resp_resampled)
+            plt.vlines(oc_trigger, ymin=resp_resampled.min(), ymax=resp_resampled.max(), color='r')
             plt.title(f"OC")
             plt.show()
 
@@ -460,12 +460,51 @@ def extract_data(sujet):
     #### aggregates
     respfeature_alltrial = pd.concat(respfeature_alltrial)
 
+    #### bipolar referencing
+    if bipolar_extraction:
+        
+        bipolar_data = []
+
+        #trial_i, trial_cond = 0, trial_list_dict[sujet][0]
+        for trial_i, trial_cond in enumerate(trial_list_dict[sujet]):
+
+            _data = data_ieeg_alltrial[trial_i]
+                    
+            # construct vec
+            chan_i_list = np.arange(_data.shape[0])
+            chan_i_list = chan_i_list[chan_i_list != chan_ref_allsujet[sujet]-1]
+
+            pairs = []
+
+            for chan_i in chan_i_list:
+
+                if chan_i != chan_i_list.size:
+
+                    if chan_i != bipolarize_chan_i_lim-1:
+
+                        pairs.append([chan_i, chan_i+1])
+
+            data_bi = [_data[pair[0]] - _data[pair[1]] for pair in pairs]
+            bipolar_data.append(np.array(data_bi))
+            
+        data_ieeg_alltrial = bipolar_data
+        chanlist = [f"{_pair[0]}_{_pair[-1]}" for _pair in pairs]
+
     return data_ieeg_alltrial, resp_alltrial, oc_trigger_alltrial, respfeature_alltrial, chanlist
 
 
 
+################################
+######## LOCAFILE ########
+################################
 
+def generate_locafile(sujet, chanlist):
 
+    df_locafile_raw = pd.DataFrame({'sujet' : [sujet]*len(chanlist), 'chan' : chanlist, 'loca_raw' : ['']*len(chanlist), 
+                       'SOZ' : np.zeros((len(chanlist))), 'OUT' : np.zeros((len(chanlist))), 'NOISY' : np.zeros((len(chanlist))), 
+                       'verified' : np.zeros((len(chanlist))), 'select' : np.ones((len(chanlist))), 'loca_modified' : ['']*len(chanlist),})
+
+    df_locafile_raw.to_excel(os.path.join(path_prep, 'anatomy', sujet, f"{sujet}_locafile_raw.xlsx"))
 
 
 ################################
@@ -550,6 +589,7 @@ def preprocessing_ieeg(data, chan_list, srate, prep_step):
     # 2. Initiate preprocessing step
 
 
+
     def mean_centered(raw):
         
         data = raw.get_data()
@@ -596,7 +636,7 @@ def preprocessing_ieeg(data, chan_list, srate, prep_step):
         else:
             raw_post = raw
 
-        raw_post.notch_filter(60, verbose='critical')
+        raw_post.notch_filter(linenoise_freq, verbose='critical')
 
         
         if debug:
@@ -693,37 +733,35 @@ def preprocessing_ieeg(data, chan_list, srate, prep_step):
     else:
         raw = raw_init
 
-    if prep_step.get('mean_centered').get('execute') :
+    if prep_step['mean_centered']['execute']:
         print('mean_centered')
         raw_post = mean_centered(raw)
         #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
         raw = raw_post
 
-
-    if prep_step.get('line_noise_removing').get('execute') :
+    if prep_step['line_noise_removing']['execute']:
         print('line_noise_removing')
         raw_post = line_noise_removing(raw)
         #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
         raw = raw_post
 
-
-    if prep_step.get('high_pass').get('execute') :
+    if prep_step['high_pass']['execute']:
         print('high_pass')
-        h_freq = prep_step.get('high_pass').get('params').get('h_freq')
-        l_freq = prep_step.get('high_pass').get('params').get('l_freq')
+        h_freq = prep_step['high_pass']['params']['h_freq']
+        l_freq = prep_step['high_pass']['params']['l_freq']
         raw_post = high_pass(raw, h_freq, l_freq)
         #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
         raw = raw_post
 
-    if prep_step.get('low_pass').get('execute') :
+    if prep_step['low_pass']['execute']:
         print('low_pass')
-        h_freq = prep_step.get('low_pass').get('params').get('h_freq')
-        l_freq = prep_step.get('low_pass').get('params').get('l_freq')
+        h_freq = prep_step['low_pass']['params']['h_freq']
+        l_freq = prep_step['low_pass']['params']['l_freq']
         raw_post = low_pass(raw, h_freq, l_freq)
         #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
         raw = raw_post
 
-    if prep_step.get('average_reref').get('execute') :
+    if prep_step['average_reref']['execute']:
         print('average_reref')
         raw_post = average_reref(raw)
         #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
@@ -814,6 +852,8 @@ def export_data(sujet, data_preproc_alltrial, resp_alltrial, oc_trigger_alltrial
 
 if __name__== '__main__':
 
+    bipolar_extraction = True
+
     #sujet = sujet_list[0]
     for sujet in sujet_list:
 
@@ -831,10 +871,28 @@ if __name__== '__main__':
         ######## EXTRACT DATA ########
         ################################
 
-        data_ieeg_alltrial, resp_alltrial, oc_trigger_alltrial, respfeature_alltrial, chanlist = extract_data(sujet)
+        data_ieeg_alltrial, resp_alltrial, oc_trigger_alltrial, respfeature_alltrial, chanlist = extract_data(sujet, bipolar_extraction)   
+
+        for trial_i, trial in enumerate(trial_list_dict[sujet]):
+        
+            #### agregate data
+            data_all = np.concat([data_ieeg_alltrial[trial_i], resp_alltrial[trial_i].reshape(1,-1)], axis=0)
+            chanlist_all = chanlist.copy()
+            chanlist_all.append('resp')
+            xr_dict = {'chan' : chanlist_all, 'time' : np.arange(data_all.shape[-1])/srate}
+            xr_data_export = xr.DataArray(data=data_all, dims=xr_dict.keys(), coords=xr_dict)
+    
+            #### save
+            xr_data_export.to_netcdf(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_raw.nc"))
 
 
+        ################################
+        ######## LOCAFILE ########
+        ################################
 
+        generate_locafile(sujet, chanlist)
+
+    
 
         ################################
         ######## PREPROCESSING ########

@@ -118,7 +118,7 @@ def export_Cxy_cond_df_sujet(sujet):
 
     data_Cxy_med = np.stack(data_Cxy_med)
 
-    xr_coords = {'cond' : conditions, 'chan' : chanlist, 'ROI' : ('chan', localist['loca'].values)}
+    xr_coords = {'cond' : conditions, 'chan' : chanlist, 'ROI' : ('chan', localist['loca_modified'].values)}
     _xr_Cxy_med = xr.DataArray(data_Cxy_med, dims=['cond', 'chan'], coords=xr_coords) 
 
     #### generate df

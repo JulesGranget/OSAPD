@@ -25,7 +25,7 @@ def plot_ERP_res(sujet):
     time_vec_ERP = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
     time_vec_plot = (-1 < time_vec_ERP) & (time_vec_ERP < 2)
     path_load = os.path.join(path_precompute, 'ERP', sujet)
-    chanlist, localist = get_locachanlist(sujet)
+    chanlist, localist = get_chanlocalist(sujet)
 
     ### load ERP
     data_ERP = {}
@@ -118,7 +118,6 @@ def plot_ERP_res(sujet):
 
         fig.clf()
         plt.close('all')
-        gc.collect()
 
     
 

@@ -26,7 +26,7 @@ def extract_stretch_TF_raw(sujet, norm_param):
     #### load
     data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet)
     respfeatures = get_respfeatures(sujet)
-    chanlist, localist = get_locachanlist(sujet)
+    chanlist, localist = get_chanlocalist(sujet)
 
     #### precompute
     #cond = conditions_oc[1]
@@ -201,7 +201,7 @@ def extract_stretch_TF_raw(sujet, norm_param):
 
         #### save stretch tf
         print(f'SAVE TF STRETCH {sujet} {cond}', flush=True)
-        dict_xr_tf_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca'].values), 'cycle' : np.arange(tf_stretch_cond.shape[1]), 'freq' : frex, 'phase' : np.arange(stretch_point_TF)} 
+        dict_xr_tf_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'cycle' : np.arange(tf_stretch_cond.shape[1]), 'freq' : frex, 'phase' : np.arange(stretch_point_TF)} 
         xr_tf_stretch_export = xr.DataArray(tf_stretch_cond, dims=("chan", "cycle", "freq", "phase"), coords=dict_xr_tf_coords)
 
         xr_tf_stretch_export.to_netcdf(os.path.join(path_export_TF, f"{sujet}_{cond}_tf_stretch.nc"))
@@ -238,7 +238,7 @@ def extract_power(sujet):
         return
 
     #### params
-    chanlist, localist = get_locachanlist(sujet)
+    chanlist, localist = get_chanlocalist(sujet)
 
     idx = np.arange(stretch_point_TF)
     inspi_sel = idx <= stretch_point_TF / 2
@@ -300,7 +300,7 @@ def extract_power(sujet):
             "sujet" : [sujet],
             "cond": conditions_oc,
             "chan": chanlist,
-            "ROI": ("chan", localist['loca'].values), 
+            "ROI": ("chan", localist['loca_modified'].values), 
             "band": bands,
             "phase": phases,
             "cycle": np.arange(max_cycle),

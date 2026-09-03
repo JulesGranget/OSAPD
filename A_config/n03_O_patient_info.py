@@ -20,3 +20,9 @@ allpatient_cycle_oc_id = {'P01' : {'trial0' : [], 'trial1' : [], 'trial2' : [], 
 shift_all_patient = {'P01' : {'trial0' : [-4.75], 'trial1' : [-7.67], 'trial2' : [-9.4], 'trial3' : [-10.24], },
 
                           }
+
+# no zero based
+chan_ref_allsujet = {'P01' : 1}
+
+
+
