@@ -154,9 +154,9 @@ def load_trial_data_sujet(sujet, trial):
 
 
 
-def get_chanlocalist(sujet):
+def get_chanlocalist(sujet, ref_type):
 
-    path_load_loca = os.path.join(path_prep, 'anatomy', sujet, f"{sujet}_locafile.xlsx")
+    path_load_loca = os.path.join(path_prep, 'anatomy', sujet, f"{sujet}_locafile_{ref_type}.xlsx")
     df_localist_raw = pd.read_excel(path_load_loca)
     df_localist_sel = df_localist_raw.query(f"select == 1")
     localist = df_localist_sel
@@ -167,7 +167,8 @@ def get_chanlocalist(sujet):
 
 
 
-def get_alltrials_sujet(sujet):
+
+def get_alltrials_sujet(sujet, ref_type):
 
     path_load_data_trial = os.path.join(path_prep, 'export', sujet)
 
@@ -176,9 +177,9 @@ def get_alltrials_sujet(sujet):
 
     for trial_i, trial_cond in enumerate(trial_list_dict[sujet]):
 
-        data_alltrial[trial_i] = xr.load_dataarray(os.path.join(path_load_data_trial, f"{sujet}_trial{trial_i+1}_preproc.nc"))
-        oc_list_alltrial[trial_i] = pd.read_excel(os.path.join(path_load_data_trial, f"{sujet}_trial{trial_i+1}_oc_trig.xlsx"))
-
+        data_alltrial[trial_i] = xr.load_dataarray(os.path.join(path_load_data_trial, f"{sujet}_trial{trial_i+1}_preproc_{ref_type}.nc"))
+        oc_list_alltrial[trial_i] = pd.read_excel(os.path.join(path_load_data_trial, f"{sujet}_trial{trial_i+1}_oc_trig_{ref_type}.xlsx"))
+        
     return data_alltrial, oc_list_alltrial
 
 

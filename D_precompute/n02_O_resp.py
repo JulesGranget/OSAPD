@@ -27,7 +27,7 @@ def extract_stretch_resp(sujet):
     path_export_stretch_respi = os.path.join(path_precompute, 'respi', 'stretch')
     
     #### load respi & CO2
-    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet)
+    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet, 'mn')
     respfeatures = get_respfeatures(sujet)
     
     #cond = conditions_oc[4]
@@ -94,7 +94,7 @@ def extract_ERP_resp(sujet):
     path_export_ERP = os.path.join(path_precompute, 'respi', 'ERP')
 
     #### load
-    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet)
+    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet, 'mn')
 
     #### precompute
     #cond = conditions_oc[0]
@@ -212,14 +212,14 @@ def extract_mean_figures_erp(sujet):
                     mins.append(min) 
                     maxs.append(max)
 
-            ax.legend()
+            if row_i == 0:
+                ax.legend()
             ax.set_title(f"{cond_cycle} {plot_type} oc300:{cycle_number_oc['oc300']}, oc600:{cycle_number_oc['oc600']}")
             ax.vlines(0, ymin=np.array(mins).min(), ymax=np.array(maxs).max(), color='r')         
 
     plt.suptitle(f'{sujet} ERP')
     plt.tight_layout()
     plt.rcParams.update({'font.size': 12})
-    plt.legend()
     # plt.show()
 
     fig_mean.savefig(os.path.join(path_export_mean_fig, f"{sujet}_erp_mean.png"))
@@ -252,7 +252,7 @@ def extract_mean_figures_stretch(sujet):
 
             for cond_oc in conditions_oc:
 
-                respfeatures_to_plot = respfeatures.query(f"cond == '{cond_oc}'")
+                respfeatures_to_plot = respfeatures.query(f"cond == '{cond_oc}'").copy()
                 respfeatures_to_plot['cycle_i_cond'] = np.arange(respfeatures_to_plot.shape[0])
                 respfeatures_to_plot = respfeatures_to_plot.query(f"oc_id in {oc_id_sel[cond_cycle]}")
                 stretch_cycle_plot  = stretch_resp[cond_oc].data[respfeatures_to_plot['cycle_i_cond'].values]
@@ -279,14 +279,15 @@ def extract_mean_figures_stretch(sujet):
                     mins.append(min) 
                     maxs.append(max)
 
-            ax.legend()
+            if row_i == 0:
+                ax.legend()
+
             ax.set_title(f"{cond_cycle} {plot_type} oc300:{cycle_number_oc['oc300']}, oc600:{cycle_number_oc['oc600']}")
             ax.vlines(int(stretch_point_TF/2), ymin=np.array(mins).min(), ymax=np.array(maxs).max(), color='r')         
 
     plt.suptitle(f'{sujet} stretch')
     plt.tight_layout()
     plt.rcParams.update({'font.size': 12})
-    plt.legend()
     # plt.show()
 
     fig_mean.savefig(os.path.join(path_export_mean_fig, f"{sujet}_stretch_mean.png"))

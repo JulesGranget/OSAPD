@@ -17,22 +17,22 @@ import joblib
 ######## PRECOMPUTE TF ########
 ################################
 
-#sujet, norm_param = sujet_list[0], 'rscore'
-def extract_stretch_TF_raw(sujet, norm_param):
+#sujet, norm_param, ref_type = sujet_list[0], 'rscore', 'bi'
+def extract_stretch_TF_raw(sujet, norm_param, ref_type):
 
     #### config
     path_export_TF = os.path.join(path_precompute, 'TF', sujet)
 
     #### load
-    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet)
+    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet, ref_type)
     respfeatures = get_respfeatures(sujet)
-    chanlist, localist = get_chanlocalist(sujet)
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
 
     #### precompute
-    #cond = conditions_oc[1]
+    #cond = conditions_oc[0]
     for cond in conditions_oc:
 
-        if os.path.exists(os.path.join(path_export_TF, f"{sujet}_{cond}_tf_stretch.nc")):
+        if os.path.exists(os.path.join(path_export_TF, f"{sujet}_{cond}_tf_stretch_{ref_type}.nc")):
             print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
             continue
         else:
@@ -204,7 +204,7 @@ def extract_stretch_TF_raw(sujet, norm_param):
         dict_xr_tf_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'cycle' : np.arange(tf_stretch_cond.shape[1]), 'freq' : frex, 'phase' : np.arange(stretch_point_TF)} 
         xr_tf_stretch_export = xr.DataArray(tf_stretch_cond, dims=("chan", "cycle", "freq", "phase"), coords=dict_xr_tf_coords)
 
-        xr_tf_stretch_export.to_netcdf(os.path.join(path_export_TF, f"{sujet}_{cond}_tf_stretch.nc"))
+        xr_tf_stretch_export.to_netcdf(os.path.join(path_export_TF, f"{sujet}_{cond}_tf_stretch_{ref_type}.nc"))
 
         #### remove
         os.remove(os.path.join(path_memmap, f'memmap_{sujet}_{trial_i}_tf_conv.npy'))
@@ -226,19 +226,19 @@ def extract_stretch_TF_raw(sujet, norm_param):
 ################################
 
 
-def extract_power(sujet):
+def extract_power(sujet, ref_type):
 
     print("EXTRACT POWER", flush=True)
 
     #### verify if already computed
     path_export_Pxx = os.path.join(path_precompute, 'Pxx')
 
-    if os.path.exists(os.path.join(path_export_Pxx, f'{sujet}_xr_Pxx.nc')):
+    if os.path.exists(os.path.join(path_export_Pxx, f'{sujet}_xr_Pxx_{ref_type}.nc')):
         print(f'{sujet} ALREADY COMPUTED', flush=True)
         return
 
     #### params
-    chanlist, localist = get_chanlocalist(sujet)
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
 
     idx = np.arange(stretch_point_TF)
     inspi_sel = idx <= stretch_point_TF / 2
@@ -261,7 +261,7 @@ def extract_power(sujet):
         print(f"{cond}")
 
         #### load
-        xr_tf = xr.open_dataarray(os.path.join(path_load_precompute_tf, f"{sujet}_{cond}_tf_stretch.nc"))
+        xr_tf = xr.open_dataarray(os.path.join(path_load_precompute_tf, f"{sujet}_{cond}_tf_stretch_{ref_type}.nc"))
 
         #### extract
         Pxx_cond = np.zeros((1, xr_tf['chan'].shape[0], len(bands), len(phases), xr_tf['cycle'].shape[0]), dtype=np.float32)
@@ -310,7 +310,7 @@ def extract_power(sujet):
 
     #### SAVE
     print('SAVE EXTRACT PXX', flush=True)
-    da_Pxx.to_netcdf(os.path.join(path_export_Pxx, f'{sujet}_xr_Pxx.nc')) 
+    da_Pxx.to_netcdf(os.path.join(path_export_Pxx, f'{sujet}_xr_Pxx_{ref_type}.nc')) 
 
     print('done', flush=True)
 
@@ -333,8 +333,11 @@ if __name__ == '__main__':
     #sujet = sujet_list[0]
     for sujet in sujet_list:
 
-        extract_stretch_TF_raw(sujet, norm_param)
-        extract_power(sujet)
+        #ref_type = 'bi'
+        for ref_type in ref_type_list:
+
+            extract_stretch_TF_raw(sujet, norm_param, ref_type)
+            extract_power(sujet, ref_type)
 
 
 

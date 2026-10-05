@@ -23,21 +23,21 @@ debug = False
 ################################
 
 #sujet = sujet_list[0]
-def epoch_ERP_wb(sujet):
+def epoch_ERP_wb(sujet, ref_type):
 
     #### config
     path_export_ERP = os.path.join(path_precompute, 'ERP', sujet)
 
     #### load
-    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet)
+    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet, ref_type)
     # respfeatures = get_respfeatures(sujet)
-    chanlist, localist = get_chanlocalist(sujet)
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
 
     #### precompute OC
     #cond = conditions_oc[0]
     for cond in conditions_oc:
 
-        if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_{cond}_WB_erp.nc")):
+        if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_{cond}_WB_erp_{ref_type}.nc")):
             print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
             continue
         else:
@@ -107,11 +107,11 @@ def epoch_ERP_wb(sujet):
         dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'epoch' : np.arange(erp_cond.shape[1]), 'time' : time_vec_epoch} 
         xr_erp_export = xr.DataArray(erp_cond, dims=("chan", "epoch", "time"), coords=dict_xr_erp_coords)
 
-        xr_erp_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_{cond}_WB_erp.nc"))
+        xr_erp_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_{cond}_WB_erp_{ref_type}.nc"))
 
     #### precompute RB
     cond = 'RB'
-    if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_RB_WB_erp.nc")):
+    if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_RB_WB_erp_{ref_type}.nc")):
         print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
         return
     else:
@@ -182,21 +182,21 @@ def epoch_ERP_wb(sujet):
     dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'epoch' : np.arange(erp_cond.shape[1]), 'time' : time_vec_epoch} 
     xr_erp_export = xr.DataArray(erp_cond, dims=("chan", "epoch", "time"), coords=dict_xr_erp_coords)
 
-    xr_erp_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_RB_WB_erp.nc"))
+    xr_erp_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_RB_WB_erp_{ref_type}.nc"))
 
 
 
 
 
 #sujet = sujet_list[0]
-def epoch_ERP_HFA(sujet):
+def epoch_ERP_HFA(sujet, ref_type, norm_token=None):
 
     #### config
     path_export_ERP = os.path.join(path_precompute, 'ERP', sujet)
 
     #### load
-    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet)
-    chanlist, localist = get_chanlocalist(sujet)
+    data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet, ref_type)
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
 
     for cond in conditions_oc:
 
@@ -263,6 +263,12 @@ def epoch_ERP_HFA(sujet):
                 plt.legend()
                 plt.show()
 
+            #### sel method
+            if norm_token == 'rscore':
+                data_hfa_sel = data_hfa_norm
+            else:
+                data_hfa_sel = data_hfa
+
             #### epoch
             oc_list_trial = (oc_list_alltrial[trial_i]['oc_trig'].values * srate).astype(int)
 
@@ -275,10 +281,10 @@ def epoch_ERP_HFA(sujet):
                 _start = epoch_trig - chunk_time_prepost_i
                 _stop = epoch_trig + chunk_time_prepost_i
 
-                if (_start < 0 or data_hfa_norm.shape[-1] < _stop):
+                if (_start < 0 or data_hfa_sel.shape[-1] < _stop):
                     continue
 
-                epoch_trial.append(data_hfa_norm[:, _start:_stop].reshape(chanlist.size, 1, -1))
+                epoch_trial.append(data_hfa_sel[:, _start:_stop].reshape(chanlist.size, 1, -1))
 
             if len(epoch_trial) == 0:
                 continue
@@ -298,12 +304,12 @@ def epoch_ERP_HFA(sujet):
 
         xr_hfa_export = xr.DataArray(hfa_cond, dims=("chan", "epoch", "time"), coords=dict_xr_hfa_coords)
 
-        xr_hfa_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_{cond}_HFA_erp.nc"))
+        xr_hfa_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_{cond}_HFA_erp_{ref_type}.nc"))
 
     #### RB
     cond = 'RB'
 
-    if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_RB_HFA_erp.nc")):
+    if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_RB_HFA_erp_{ref_type}.nc")):
         print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
         return
 
@@ -368,6 +374,12 @@ def epoch_ERP_HFA(sujet):
             plt.legend()
             plt.show()
 
+        #### sel method
+        if norm_token == 'rscore':
+            data_hfa_sel = data_hfa_norm
+        else:
+            data_hfa_sel = data_hfa
+
         #### inspi
 
         inspi_starts_i_list = respfeatures.query(f"trial == {trial_i} and oc_id == 0")['inspi_index'].values
@@ -381,10 +393,10 @@ def epoch_ERP_HFA(sujet):
             _start = epoch_trig - chunk_time_prepost_i
             _stop = epoch_trig + chunk_time_prepost_i
 
-            if (_start < 0 or data_hfa_norm.shape[-1] < _stop):
+            if (_start < 0 or data_hfa_sel.shape[-1] < _stop):
                 continue
 
-            epoch_trial.append(data_hfa_norm[:, _start:_stop].reshape(chanlist.size, 1, -1))
+            epoch_trial.append(data_hfa_sel[:, _start:_stop].reshape(chanlist.size, 1, -1))
 
         if len(epoch_trial) == 0:
             continue
@@ -405,7 +417,7 @@ def epoch_ERP_HFA(sujet):
 
     xr_hfa_export = xr.DataArray(hfa_cond, dims=("chan", "epoch", "time"), coords=dict_xr_hfa_coords)
 
-    xr_hfa_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_RB_HFA_erp.nc"))
+    xr_hfa_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_RB_HFA_erp_{ref_type}.nc"))
 
 
 
@@ -420,16 +432,16 @@ def epoch_ERP_HFA(sujet):
 
 
 #sujet = sujet_list[0]
-def get_perm_stats_wb(sujet):
+def get_perm_stats_wb(sujet, ref_type):
 
     ######## VERIFY COMPUTATION ########
-    if os.path.exists(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_wb.nc")):
+    if os.path.exists(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_WB_{ref_type}.nc")):
         return
 
     ######## CONFIG ########
     path_load_ERP = os.path.join(path_precompute, 'ERP', sujet)
 
-    chanlist, localist = get_chanlocalist(sujet)
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
     conditions_sel = conditions_oc
     time_vec = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
 
@@ -444,13 +456,12 @@ def get_perm_stats_wb(sujet):
         ######## COMPUTE PERMUTATION ########
         print(f'chan{chan} COMPUTE PERMUTATION')
 
-        baseline_data = xr.open_dataarray(os.path.join(path_load_ERP, f"{sujet}_RB_WB_erp.nc"))
+        baseline_data = xr.open_dataarray(os.path.join(path_load_ERP, f"{sujet}_RB_WB_erp_{ref_type}.nc"))
 
         #cond_i, cond = 0, conditions_sel[0]
         for cond_i, cond in enumerate(conditions_sel):
 
-            erp_data = xr.open_dataarray(os.path.join(path_load_ERP, f"{sujet}_{cond}_WB_erp.nc"))
-
+            erp_data = xr.open_dataarray(os.path.join(path_load_ERP, f"{sujet}_{cond}_WB_erp_{ref_type}.nc"))
 
             data_baseline = baseline_data.sel(chan=chan).data
             data_cond = erp_data.sel(chan=chan).data
@@ -468,7 +479,7 @@ def get_perm_stats_wb(sujet):
     ######## SAVE ########
     xr_coords = {'cond' : conditions_sel, 'chan' : chanlist, 'time' : time_vec}
     xr_cluster_based_perm = xr.DataArray(data=xr_data, dims=xr_coords.keys(), coords=xr_coords.values())
-    xr_cluster_based_perm.to_netcdf(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_wb.nc"))
+    xr_cluster_based_perm.to_netcdf(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_WB_{ref_type}.nc"))
 
     os.chdir(path_memmap)
     try:
@@ -481,16 +492,16 @@ def get_perm_stats_wb(sujet):
 
 
 #sujet = sujet_list[0]
-def get_perm_stats_HFA(sujet):
+def get_perm_stats_HFA(sujet, ref_type):
 
     ######## VERIFY COMPUTATION ########
-    if os.path.exists(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_HFA.nc")):
+    if os.path.exists(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_HFA_{ref_type}.nc")):
         return
 
     ######## CONFIG ########
     path_load_ERP = os.path.join(path_precompute, 'ERP', sujet)
 
-    chanlist, localist = get_chanlocalist(sujet)
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
     conditions_sel = conditions_oc
     time_vec = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
 
@@ -505,12 +516,12 @@ def get_perm_stats_HFA(sujet):
         ######## COMPUTE PERMUTATION ########
         print(f'chan{chan} COMPUTE PERMUTATION')
 
-        baseline_data = xr.open_dataarray(os.path.join(path_load_ERP, f"{sujet}_RB_HFA_erp.nc"))
+        baseline_data = xr.open_dataarray(os.path.join(path_load_ERP, f"{sujet}_RB_HFA_erp_{ref_type}.nc"))
 
         #cond_i, cond = 0, conditions_sel[0]
         for cond_i, cond in enumerate(conditions_sel):
 
-            erp_data = xr.open_dataarray(os.path.join(path_load_ERP, f"{sujet}_{cond}_HFA_erp.nc"))
+            erp_data = xr.open_dataarray(os.path.join(path_load_ERP, f"{sujet}_{cond}_HFA_erp_{ref_type}.nc"))
 
             data_baseline = baseline_data.sel(chan=chan).data
             data_cond = erp_data.sel(chan=chan).data
@@ -528,7 +539,7 @@ def get_perm_stats_HFA(sujet):
     ######## SAVE ########
     xr_coords = {'cond' : conditions_sel, 'chan' : chanlist, 'time' : time_vec}
     xr_cluster_based_perm = xr.DataArray(data=xr_data, dims=xr_coords.keys(), coords=xr_coords.values())
-    xr_cluster_based_perm.to_netcdf(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_HFA.nc"))
+    xr_cluster_based_perm.to_netcdf(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_HFA_{ref_type}.nc"))
 
     os.chdir(path_memmap)
     try:
@@ -551,15 +562,17 @@ def get_perm_stats_HFA(sujet):
 
 if __name__ == '__main__':
 
-    
-    sujet = sujet_list[0]
+    #sujet = sujet_list[0]
     for sujet in sujet_list:
 
-        print(f'#### {sujet} ####', flush=True)
-        print(f'COMPUTE', flush=True)
+        #ref_type = 'mn'
+        for ref_type in ref_type_list:
 
-        epoch_ERP_wb(sujet)
-        epoch_ERP_HFA(sujet)
-        get_perm_stats_wb(sujet)
-        get_perm_stats_HFA(sujet)
+            print(f'#### {sujet} ####', flush=True)
+            print(f'COMPUTE', flush=True)
+
+            epoch_ERP_wb(sujet, ref_type)
+            epoch_ERP_HFA(sujet, ref_type)
+            get_perm_stats_wb(sujet, ref_type)
+            get_perm_stats_HFA(sujet, ref_type)
 

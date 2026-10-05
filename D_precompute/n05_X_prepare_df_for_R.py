@@ -90,7 +90,7 @@ def export_Cxy_cond_df_sujet(sujet):
     ### extract Cxy around respi
     respfeature = get_respfeatures_main(sujet)
 
-    trial_list = get_alltrials_sujet(sujet)
+    trial_list = get_alltrials_sujet(sujet, ref_type)
 
     resp_med_allcond = {}
 

@@ -16,7 +16,7 @@ srate = 500
 
 sujet_pilot = ['test']
 
-sujet_list = ['P01']
+sujet_list = ['P01', 'P02', 'P03', 'P04']
 
 
 conditions_oc = ['oc300', 'oc600']
@@ -27,7 +27,7 @@ aux_chanlist = ['resp', 'co2', 'gsm']
 
 freq_band_dict = {'theta' : [4,8], 'alpha' : [8,12], 'beta' : [12,50], 'gamma' : [60, 150]}
 
-
+ref_type_list = ['mn', 'bi']
 
 
 

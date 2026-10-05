@@ -17,7 +17,7 @@ from A_config.n03_O_patient_info import *
 
 
 
-def tf_relative_patientwise(sujet):
+def tf_relative_patientwise(sujet, ref_type):
 
     #### config
     path_load_TF = os.path.join(path_precompute, 'TF', sujet)
@@ -27,14 +27,14 @@ def tf_relative_patientwise(sujet):
 
     #### load extract vlim
     respfeatures = get_respfeatures(sujet)
-    chanlist, localist = get_chanlocalist(sujet)
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
 
     xr_dict_data = {}
     xr_RB_data = []
 
     for cond in conditions_oc:
 
-        _xr_load = xr.open_dataarray(os.path.join(path_load_TF, f"{sujet}_{cond}_tf_stretch.nc"))
+        _xr_load = xr.open_dataarray(os.path.join(path_load_TF, f"{sujet}_{cond}_tf_stretch_{ref_type}.nc"))
         oc_id_sel_cond = respfeatures.query(f"cond == '{cond}'").reset_index(drop=True).query(f"oc_id == 2").index.values
         _xr_cond = _xr_load.sel(cycle=oc_id_sel_cond)
         xr_dict_data[cond] = _xr_cond
@@ -146,7 +146,9 @@ def tf_relative_patientwise(sujet):
 
         # plt.show()
 
-        fig.savefig(os.path.join(path_export_TF, f"{sujet}_{chan}_TF.jpeg"))
+        fig.savefig(os.path.join(path_export_TF, f"{sujet}_{chan}_TF_{ref_type}.jpeg"))
+
+        plt.close('all')
 
 
 
@@ -163,7 +165,10 @@ if __name__ == '__main__':
     #sujet = sujet_list[0]
     for sujet in sujet_list:
 
-        tf_relative_patientwise(sujet)
+        #ref_type = 'mn'
+        for ref_type in ref_type_list:
+
+            tf_relative_patientwise(sujet, ref_type)
 
     
 

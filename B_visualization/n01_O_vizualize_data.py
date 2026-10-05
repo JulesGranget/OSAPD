@@ -224,8 +224,9 @@ if __name__ == '__main__':
     #### load
     sujet = 'P01'
     trial_i = 0
+    ref_type = 'mn'
 
-    chanlist, localist = get_chanlocalist(sujet)
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
 
     xr_data = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_raw.nc"))
 
