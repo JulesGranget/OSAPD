@@ -97,7 +97,7 @@ def sync_resp_ieeg(resp, ieeg, resp_trig, ieeg_trig, resp_srate, ieeg_srate, tar
 
 
 
-#sujet = sujet_list[1]
+#sujet = sujet_list[8]
 def extract_data(sujet):
 
     #### config
@@ -108,24 +108,14 @@ def extract_data(sujet):
     srate = 500
     srate_SL = 100
 
-    #### channel name load
-    nchan_extraction = 16
-    chanlist_extraction = []
+    #### channel name load    
+    chanlist_extraction_ecog = []
 
-    for chan_i in range(nchan_extraction):
-        if chan_i < 9:
-            chanlist_extraction.append(f"CECOG_LF_1___0{chan_i+1}")
+    for chan_i in dict_nchan_allsujet[sujet]['ECOG']:
+        if chan_i < 10:
+            chanlist_extraction_ecog.append(f"CECOG_LF_1___0{chan_i}")
         else:
-            chanlist_extraction.append(f"CECOG_LF_1___{chan_i+1}")
-
-    if sujet in ['P01', 'P02']:
-        chan_trig_extraction = ['CDIG_IN_1_Up', 'CDIG_IN_1_Down']
-        srate_trig_extraction = 'CDIG_IN_1_KHz'
-    else:
-        chan_trig_extraction = 'CANALOG_IN_1'
-        srate_trig_extraction = 'CANALOG_IN_1_KHz'
-
-    chanlist = chanlist_extraction
+            chanlist_extraction_ecog.append(f"CECOG_LF_1___{chan_i}")
 
     #### breathing load
     df_SL_raw = pd.read_csv(path_resp_data, low_memory=False)
@@ -146,7 +136,7 @@ def extract_data(sujet):
         plt.plot(scipy.stats.zscore(df_SL_raw['Module 4: Raw Flow'].values[1:].astype('float')))
         plt.show()
 
-    #### clean trigger
+    #### clean trigger when start and stop are badly positioned
     if debug:
 
         trigger_spot = np.array([[57900, 58100], [131300, 131350]])
@@ -155,9 +145,9 @@ def extract_data(sujet):
         plt.vlines(trigger_spot.reshape(-1), ymin=scipy.stats.zscore(resp_raw).min(), ymax=scipy.stats.zscore(resp_raw).max(), color='r')
         plt.show()
 
-    if sujet in correction_trig_all_patient:
+    if sujet in correction_trig_SL_all_patient:
         
-        for start, stop in correction_trig_all_patient[sujet]:
+        for start, stop in correction_trig_SL_all_patient[sujet]:
             trig_SL[start:stop] = 1
 
     #### trigger correction
@@ -169,13 +159,13 @@ def extract_data(sujet):
     else:
         diff_trig_i = np.diff(trigger_SL)
         diff_trig_i = diff_trig_i[diff_trig_i != 1]
-        thresh_trial_start_stop = (np.log(diff_trig_i)*-1).max()*2.5
+        thresh_trial_start_stop = (np.log(diff_trig_i)*-1).max()*fasttrig_correction_allsujet[sujet]
         _trig_i_list_fast = np.where(thresh_trial_start_stop < np.log(np.diff(trigger_SL))*-1)[0]
         diff_fast_trig = np.diff(trigger_SL[_trig_i_list_fast])
         trigger_SL_trial_chunk_i = np.where((diff_fast_trig.max() - diff_fast_trig.min())/10 < diff_fast_trig)[0]
         trigger_SL_trial_chunk_i = np.concat([trigger_SL_trial_chunk_i, [diff_fast_trig.size]])
         trigger_SL_trial_chunk = trigger_SL[_trig_i_list_fast[trigger_SL_trial_chunk_i]+1]
-        trigger_SL_trial_chunk = trigger_SL_trial_chunk.reshape(4,-1)
+        trigger_SL_trial_chunk = trigger_SL_trial_chunk.reshape(len(trial_list_dict[sujet]),-1)
 
     if debug:
             
@@ -186,7 +176,7 @@ def extract_data(sujet):
 
         plt.plot(trig_diff)
         plt.vlines(trigger_SL, ymin=-2, ymax=2, color='r')
-        plt.vlines(trigger_SL_trial_chunk.reshape(-1), ymin=-2, ymax=2, color='g')
+        plt.vlines(trigger_SL_trial_chunk.reshape(-1), ymin=-2.5, ymax=2.5, color='g')
         plt.show()
 
     #### extract ieeg
@@ -195,11 +185,11 @@ def extract_data(sujet):
     oc_trigger_alltrial = []
     respfeature_alltrial = []
 
-    #trial_i, trial_cond = 1, trial_list_dict[sujet][1]
+    #trial_i, trial_cond = 3, trial_list_dict[sujet][3]
     for trial_i, trial_cond in enumerate(trial_list_dict[sujet]):
 
         print(trial_i, trial_cond)
-        
+
         filename = [_file for _file in os.listdir(path_data_raw) if _file[:2] == f"0{trial_i+1}"][0]
         data_raw = scipy.io.loadmat(os.path.join(path_data_raw, filename))
         data_raw = {key.replace('\x00', 'x00'): value for key, value in data_raw.items()}
@@ -208,6 +198,11 @@ def extract_data(sujet):
 
             data_raw.keys()
 
+            key_open_sig = [_key for _key in data_raw.keys() if _key.find('CMacro') != -1]
+            key_open_sig = [_key for _key in key_open_sig if _key.find('x00') != -1]
+                        
+            data_raw["CMacro_RAW_01___Central_KHz"]
+
             key_open_sig = [_key for _key in data_raw.keys() if _key.find('x00') != -1]
             
             for _key_sig in key_open_sig:
@@ -215,6 +210,8 @@ def extract_data(sujet):
                 plt.title(_key_sig)
                 plt.show()
 
+        chanlist_extraction = np.concat([chanlist_extraction_ecog, dict_nchan_allsujet[sujet]['MACRO']])        
+            
         data_ieeg = np.array([data_raw[f"{chan}x00"].reshape(-1) for chan in chanlist_extraction])
         srate_ieeg_list = np.array([data_raw[f"{chan}_KHz"].reshape(-1) for chan in chanlist_extraction])
 
@@ -238,6 +235,9 @@ def extract_data(sujet):
             plt.show()
 
         #### ieeg trig
+        chan_trig_extraction = dict_chantrig_extraction_allpatient[sujet]
+        srate_trig_extraction = dict_chantrig_srate_extraction_allpatient[sujet]
+        
         if sujet in ['P01', 'P02']:
 
             trial_start = np.array([data_raw[f"{chan}_TimeBegin"].reshape(-1) for chan in chanlist_extraction])
@@ -256,6 +256,37 @@ def extract_data(sujet):
         else:
 
             trig_ieeg = data_raw[f"{chan_trig_extraction}x00"].reshape(-1)
+
+            if sujet == 'P09' and trial_i in [1,2,3]:
+
+                _trig_ieeg_filter = scipy.signal.savgol_filter(x=trig_ieeg, window_length=int(srate_ieeg*0.5), polyorder=1)
+                _separator_trig = (_trig_ieeg_filter.max() - _trig_ieeg_filter.min())/2
+                _trig_ieeg = ((_separator_trig < _trig_ieeg_filter)*1)*_trig_ieeg_filter.max()
+
+                copy_paste_from_original_list = {1 : [[12000,16000], [886000,890000]], 2 : [[9000, 11000], [841500, 844000]], 3 : [[4000, 8000], [837000, 840000]]}
+
+                for _start, _stop in copy_paste_from_original_list[trial_i]:
+                    _trig_ieeg[_start:_stop] = trig_ieeg[_start:_stop]
+
+                if trial_i == 2:
+                    _trig_ieeg[:6000] = _trig_ieeg[6000]
+
+                if debug:
+                    plt.plot(trig_ieeg)
+                    plt.plot(_trig_ieeg_filter)
+                    plt.hlines(_separator_trig, xmin=0, xmax=trig_ieeg.size, color='r')
+                    plt.plot(_trig_ieeg)
+                    plt.show()
+
+                trig_ieeg = _trig_ieeg
+
+            if sujet in correction_trig_iEEG_all_patient:
+
+                if f"trial{trial_i}" in correction_trig_iEEG_all_patient[sujet]:
+                    
+                    for start, stop in correction_trig_iEEG_all_patient[sujet][f"trial{trial_i}"]:
+                        trig_ieeg[start:stop] = trig_ieeg[start-1]
+
             trig_ieeg_srate = int(data_raw[srate_trig_extraction][0,0]*1e3)
 
             trig_ieeg_sig_thresh = (np.median(trig_ieeg) - np.min(trig_ieeg))*0.25
@@ -270,26 +301,35 @@ def extract_data(sujet):
             _trig_i_list_fast = np.where(thresh_trial_start_stop < diff_trig_i_log)[0]
             start_ieeg_trig = data_trig_ieeg_raw[_trig_i_list_fast[np.argmax(np.diff(_trig_i_list_fast))]+1]
             stop_ieeg_trig = data_trig_ieeg_raw[-1]
+
+            data_trig_ieeg = data_trig_ieeg_raw - start_ieeg_trig
             
-            if debug:
+        if debug:
 
-                plt.plot(trig_ieeg)
-                plt.show()
+            plt.plot(trig_ieeg)
+            plt.show()
 
-                plt.plot(diff_trig_i_log)
-                plt.hlines(thresh_trial_start_stop, xmin=0, xmax=diff_trig_i_log.size, color='r')
-                plt.show()
+            plt.plot(diff_trig_i_log)
+            plt.hlines(thresh_trial_start_stop, xmin=0, xmax=diff_trig_i_log.size, color='r')
+            plt.show()
 
-                plt.plot(trig_ieeg_clean)
-                plt.vlines(trig_ieeg_clean_i, ymin=trig_ieeg_clean.min(), ymax=trig_ieeg_clean.max(), color='r')
-                plt.vlines([start_ieeg_trig*trig_ieeg_srate, stop_ieeg_trig*trig_ieeg_srate], ymin=trig_ieeg_clean.min()*1.2, ymax=trig_ieeg_clean.max()*1.2, color='g')
-                plt.show()
+            plt.plot(trig_ieeg_clean)
+            plt.vlines(trig_ieeg_clean_i, ymin=trig_ieeg_clean.min(), ymax=trig_ieeg_clean.max(), color='r')
+            plt.vlines([start_ieeg_trig*trig_ieeg_srate, stop_ieeg_trig*trig_ieeg_srate], ymin=trig_ieeg_clean.min()*1.2, ymax=trig_ieeg_clean.max()*1.2, color='g')
+            plt.show()
 
-        data_trig_ieeg_diff = np.diff(data_trig_ieeg_raw, append=data_trig_ieeg_raw[-1]+10)
+        data_trig_ieeg_diff = np.diff(data_trig_ieeg, append=data_trig_ieeg[-1]+10)
 
         clean_ieeg_thresh_sec = 0.2
+
+        if debug:
+
+            plt.plot(data_trig_ieeg_diff)
+            plt.hlines(clean_ieeg_thresh_sec, xmin=0, xmax=data_trig_ieeg_diff.shape[-1], colors='r')
+            plt.show()
+
         sel_vec_clean_short = data_trig_ieeg_diff < clean_ieeg_thresh_sec 
-        data_trig_ieeg_cleaned_short = data_trig_ieeg_raw[~sel_vec_clean_short]
+        data_trig_ieeg_cleaned_short = data_trig_ieeg[~sel_vec_clean_short]
         trig_to_chunk_ieeg = (np.array([data_trig_ieeg_cleaned_short[0], data_trig_ieeg_cleaned_short[-1]])*srate_ieeg).astype(int)
 
         data_ieeg_chunked = data_ieeg[:,trig_to_chunk_ieeg[0]:trig_to_chunk_ieeg[-1]]
@@ -321,6 +361,7 @@ def extract_data(sujet):
         trigger_trial_start_SL = trigger_SL_trial_chunk[trial_i][0]/srate_SL
         trigger_SL_trial = trigger_SL_chunk/srate_SL - trigger_trial_start_SL
 
+        #### first bad trigs removal
         if sujet == 'P04' and trial_i == 1:
             crop_to_correct = trigger_SL_trial[1]
             trigger_SL_trial = trigger_SL_trial[1:] - trigger_SL_trial[1] 
@@ -359,6 +400,7 @@ def extract_data(sujet):
         trigger_SL_trial_corrected_final = []
         window_exclusion = 0.8
 
+        #trig_i, trig_val = 2, trigger_SL_trial[2]
         for trig_i, trig_val in enumerate(trigger_SL_trial):
 
             _win_start, _win_stop = trig_val-window_exclusion/2, trig_val+window_exclusion/2
@@ -387,13 +429,14 @@ def extract_data(sujet):
         
             time_vec = np.arange(resp_chunk.size)/srate_SL
             plt.plot(time_vec, resp_chunk)
-            plt.vlines(data_trig_ieeg_corrected_final, ymin=resp_chunk.min(), ymax=resp_chunk.max(), color='r', label='iEEG')
-            plt.vlines(trigger_SL_trial_corrected_final, ymin=resp_chunk.min(), ymax=resp_chunk.max(), color='g', label='SL')
+            plt.vlines(data_trig_ieeg_corrected_final, ymin=resp_chunk.min()*-1, ymax=resp_chunk.max()*-2, color='r', label='iEEG')
+            plt.vlines(trigger_SL_trial_corrected_final, ymin=resp_chunk.min()*1, ymax=resp_chunk.max()*2, color='g', label='SL')
             plt.legend()
             plt.show()
 
         #### remove SL trig if SL longer than iEEG
         trigger_SL_trial_corrected_final = trigger_SL_trial_corrected_final[trigger_SL_trial_corrected_final < data_ieeg.shape[-1]/srate_ieeg]
+        data_trig_ieeg_corrected_final = data_trig_ieeg_corrected_final[data_trig_ieeg_corrected_final < data_ieeg.shape[-1]/srate_ieeg]
 
         if trigger_SL_trial_corrected_final.size != data_trig_ieeg_corrected_final.size:
             raise ValueError('!!! trig not same size)')
@@ -416,10 +459,14 @@ def extract_data(sujet):
 
         #### process resp
         resp_clean_smooth = physio.smooth_signal(resp_resampled, srate, win_shape='gaussian', sigma_ms=40.0)
+        
+        if sujet == 'P07':
+
+            resp_clean_smooth = scipy.signal.savgol_filter(resp_resampled, srate*1, polyorder=1)
 
         if debug:
+
             resp_resampled_clean = physio.preprocess(resp_resampled, srate, band=25., btype='lowpass', ftype='bessel', order=5, normalize=False)
-            resp_clean_smooth = physio.smooth_signal(resp_resampled_clean, srate, win_shape='gaussian', sigma_ms=40.0)
             
             plt.plot(resp_resampled, label='raw')
             plt.plot(resp_resampled_clean, label='resp_clean')
@@ -428,6 +475,10 @@ def extract_data(sujet):
             plt.show()
 
         cycles_raw = physio.detect_respiration_cycles(resp_resampled, srate, method="crossing_baseline", baseline_mode='zero')
+
+        if sujet == 'P07':
+
+            cycles_raw = physio.detect_respiration_cycles(resp_clean_smooth, srate, method="crossing_baseline", baseline_mode='zero')
 
         #### verify cycle detection
         if debug:
@@ -445,6 +496,51 @@ def extract_data(sujet):
             plt.rcParams.update({'font.size': 12})
             plt.show()
 
+        #### correct cycle detection
+        if (sujet in correction_cycle_detect_all_patient) and (f"trial{trial_i}" in correction_cycle_detect_all_patient[sujet]):
+
+            resp_resampled_corrected = resp_clean_smooth.copy()
+
+            for seg_to_correct in correction_cycle_detect_all_patient[sujet][f"trial{trial_i}"]:
+
+                _start_i, _stop_i = int(seg_to_correct[0]*srate), int(seg_to_correct[1]*srate)
+                _start_val_respi, _stop_val_respi = resp_clean_smooth[_start_i], resp_clean_smooth[_stop_i]
+                _vec_correct = np.linspace(_start_val_respi, _stop_val_respi, _stop_i-_start_i)
+                resp_resampled_corrected[_start_i:_stop_i] = _vec_correct
+
+            cycles_corr = physio.detect_respiration_cycles(resp_resampled_corrected, srate, method="crossing_baseline", baseline_mode='zero')
+
+            if debug:
+                time_vec = np.arange(resp_resampled.shape[0])/srate
+                ymin, ymax = resp_resampled.min(), resp_resampled.max()
+                fig, ax = plt.subplots(figsize=(18, 10))
+                ax.plot(time_vec, resp_resampled)
+                ax.plot(time_vec, resp_resampled_corrected)
+                ax.scatter(cycles_raw[:,0]/srate, resp_resampled[cycles_raw[:,0]], color='g', label='inspi_selected')
+                ax.scatter(cycles_raw[:,1]/srate, resp_resampled[cycles_raw[:,1]], color='c', label='expi_selected', marker='s')
+                ax.scatter(cycles_raw[:,2]/srate, resp_resampled[cycles_raw[:,2]], color='r', label='next_inspi_selected', marker='s')
+                ax.vlines(trigger_synced, ymin=ymin, ymax=ymax, color='r')
+                plt.legend()
+                plt.title(f"{sujet} {trial_i} resp")
+                plt.rcParams.update({'font.size': 12})
+                plt.show()
+
+                time_vec = np.arange(resp_resampled.shape[0])/srate
+                ymin, ymax = resp_resampled.min(), resp_resampled.max()
+                fig, ax = plt.subplots(figsize=(18, 10))
+                ax.plot(time_vec, resp_resampled)
+                ax.scatter(cycles_corr[:,0]/srate, resp_resampled[cycles_corr[:,0]], color='g', label='inspi_selected')
+                ax.scatter(cycles_corr[:,1]/srate, resp_resampled[cycles_corr[:,1]], color='c', label='expi_selected', marker='s')
+                ax.scatter(cycles_corr[:,2]/srate, resp_resampled[cycles_corr[:,2]], color='r', label='next_inspi_selected', marker='s')
+                ax.vlines(trigger_synced, ymin=ymin, ymax=ymax, color='r')
+                plt.legend()
+                plt.title(f"{sujet} {trial_i} resp")
+                plt.rcParams.update({'font.size': 12})
+                plt.show()
+
+            cycles_raw = cycles_corr.copy()
+
+        #### compute respfeatures
         resp_features_trial = physio.compute_respiration_cycle_features(resp_resampled, srate, cycles_raw, baseline=None)
 
         #### export resp figure
@@ -497,8 +593,8 @@ def extract_data(sujet):
                     _oc_id = 2
                     oc_trigger.append(cycle_start)
 
-                if 4 < trigger_cycle.size:
-                    raise ValueError('!!! error in cycle trig number !!!')                    
+                # if 4 < trigger_cycle.size:
+                #     raise ValueError('!!! error in cycle trig number !!!')                    
 
             sujet_oc_id.append(_oc_id)
 
@@ -579,7 +675,12 @@ def extract_data(sujet):
     #### aggregates
     respfeature_alltrial = pd.concat(respfeature_alltrial)
 
-    return data_ieeg_alltrial_raw, resp_alltrial, oc_trigger_alltrial, respfeature_alltrial, chanlist
+    return data_ieeg_alltrial_raw, resp_alltrial, oc_trigger_alltrial, respfeature_alltrial, chanlist_extraction.tolist()
+
+
+
+
+
 
 
 def bipolar_ref(data_ieeg_alltrial_raw):
@@ -587,24 +688,27 @@ def bipolar_ref(data_ieeg_alltrial_raw):
     #### bipolar referencing   
     bipolar_data = []
 
+    #### construct vec
+    ref_i = chan_ref_allsujet[sujet]
+    chan_i_list = np.arange(data_ieeg_alltrial_raw[0].shape[0])
+
+    if isinstance(ref_i, int):
+        chan_i_list = chan_i_list[chan_i_list != ref_i-1]
+
+    pairs = []
+
+    for chan_i in chan_i_list:
+
+        if chan_i != chan_i_list.size:
+
+            if chan_i not in bipolarize_chan_i_lim:
+
+                pairs.append([chan_i, chan_i+1])
+
     #trial_i, trial_cond = 0, trial_list_dict[sujet][0]
     for trial_i, trial_cond in enumerate(trial_list_dict[sujet]):
 
         _data = data_ieeg_alltrial_raw[trial_i]
-                
-        # construct vec
-        chan_i_list = np.arange(_data.shape[0])
-        chan_i_list = chan_i_list[chan_i_list != chan_ref_allsujet[sujet]-1]
-
-        pairs = []
-
-        for chan_i in chan_i_list:
-
-            if chan_i != chan_i_list.size:
-
-                if chan_i != bipolarize_chan_i_lim-1:
-
-                    pairs.append([chan_i, chan_i+1])
 
         data_bi = [_data[pair[0]] - _data[pair[1]] for pair in pairs]
         bipolar_data.append(np.array(data_bi))
@@ -628,7 +732,7 @@ def generate_locafile(sujet, chanlist, filename):
                        'SOZ' : np.zeros((len(chanlist))), 'OUT' : np.zeros((len(chanlist))), 'NOISY' : np.zeros((len(chanlist))), 
                        'verified' : np.zeros((len(chanlist))), 'select' : np.ones((len(chanlist))), 'loca_modified' : ['']*len(chanlist),})
 
-    df_locafile_raw.to_excel(os.path.join(path_prep, 'anatomy', sujet, filename))
+    df_locafile_raw.to_excel(os.path.join(path_prep, 'anatomy', filename))
 
 
 
@@ -684,29 +788,31 @@ def compare_pre_post(data_pre, data_post, chanlist, srate, chan_name):
 ######## PREPROCESSING ########
 ################################
 
-#data, chan_list, srate, prep_step, trial_i, ref_type = data_alltrial_sel[trial_i], chanlist_sel, srate, prep_step_wb, trial_i, ref_type
-def preprocessing_ieeg(data, chan_list, srate, prep_step, trial_i, ref_type):
+#data, chan_list, srate, prep_step, trial_i, ref_type = data_ieeg_alltrial_raw[trial_i], chanlist, srate, prep_step_wb, trial_i, ref_type
+def preprocessing_ieeg(sujet, trial_i, srate, prep_step, ref_type):
 
     print('#### PREPROCESSING ####')
 
-    #### export raw PRE PSD
-    fig, ax = plt.subplots(figsize=(10,8))
-    for chan_i, chan in enumerate(chan_list):
-        x = data[chan_i]
-        frex, Pxx = scipy.signal.welch(x, fs=srate, nperseg=int(srate * 4))
-        ax.semilogy(frex, Pxx, label=chan)
-    plt.legend()
-    # plt.show()
-    fig.savefig(os.path.join(path_results, 'Pxx', 'raw_preproc', f"{sujet}_PRE_t{trial_i}_{ref_type}.png"))
+    #### load
+    path_export = os.path.join(path_prep, 'export', sujet)
+    
+    data_raw = xr.load_dataarray(os.path.join(path_export, f"{sujet}_trial{trial_i+1}_raw_{ref_type}.nc"))
+    data = data_raw[:-1]
+    resp = data_raw[-1].values
 
+    df_localist_raw = pd.read_excel(os.path.join(path_prep, 'anatomy', f"{sujet}_locafile_{ref_type}.xlsx"))
+    sel_vec = df_localist_raw['select'].values.astype('bool')
+
+    data = data[sel_vec]
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
 
     #### preproc
     
     # 1. Generate raw structures
 
-    ch_types = ['seeg'] * (np.size(data,0)) # ‘ecg’, ‘stim’, ‘eog’, ‘misc’, ‘seeg’, ‘eeg’
+    ch_types = ['seeg'] * data.shape[0] # ‘ecg’, ‘stim’, ‘eog’, ‘misc’, ‘seeg’, ‘eeg’
 
-    info = mne.create_info(chan_list, srate, ch_types=ch_types, verbose='critical')
+    info = mne.create_info(chanlist.tolist(), srate, ch_types=ch_types, verbose='critical')
     raw_init = mne.io.RawArray(data, info, verbose='critical')
 
     if debug:
@@ -720,7 +826,7 @@ def preprocessing_ieeg(data, chan_list, srate, prep_step, trial_i, ref_type):
             hzPxx, Pxx = scipy.signal.welch(raw_init.get_data()[nchan,:], fs=srate, window=hannw, nperseg=nwind, noverlap=noverlap, nfft=nfft)
 
             plt.semilogy(hzPxx, Pxx)
-            plt.title(chan_list[nchan])
+            plt.title(chanlist[nchan])
             #plt.show()
         #plt.show()
         plt.close()
@@ -944,13 +1050,13 @@ def preprocessing_ieeg(data, chan_list, srate, prep_step, trial_i, ref_type):
     if prep_step['mean_centered']['execute']:
         print('mean_centered')
         raw_post = mean_centered(raw)
-        #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
+        #compare_pre_post(raw_init.get_data(), raw_post.get_data(), chanlist, 500, 'CECOG_LF_1___01')
         raw = raw_post
 
     if prep_step['line_noise_removing']['execute']:
         print('line_noise_removing')
         raw_post = line_noise_removing(raw)
-        #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
+        #compare_pre_post(raw_init.get_data(), raw_post.get_data(), chanlist, 500, 'CECOG_LF_1___01')
         raw = raw_post
 
     if prep_step['high_pass']['execute']:
@@ -958,7 +1064,7 @@ def preprocessing_ieeg(data, chan_list, srate, prep_step, trial_i, ref_type):
         h_freq = prep_step['high_pass']['params']['h_freq']
         l_freq = prep_step['high_pass']['params']['l_freq']
         raw_post = high_pass(raw, h_freq, l_freq)
-        #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
+        #compare_pre_post(raw_init.get_data(), raw_post.get_data(), chanlist, 500, 'CECOG_LF_1___01')
         raw = raw_post
 
     if prep_step['low_pass']['execute']:
@@ -966,13 +1072,13 @@ def preprocessing_ieeg(data, chan_list, srate, prep_step, trial_i, ref_type):
         h_freq = prep_step['low_pass']['params']['h_freq']
         l_freq = prep_step['low_pass']['params']['l_freq']
         raw_post = low_pass(raw, h_freq, l_freq)
-        #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
+        #compare_pre_post(raw_init.get_data(), raw_post.get_data(), chanlist, 500, 'CECOG_LF_1___01')
         raw = raw_post
 
     if prep_step['average_reref']['execute']:
         print('average_reref')
         raw_post = average_reref(raw)
-        #compare_pre_post(raw.get_data(), raw_post.get_data(), 5)
+        #compare_pre_post(raw_init.get_data(), raw_post.get_data(), chanlist, 500, 'CECOG_LF_1___01')
         raw = raw_post
 
     data_preproc = raw.get_data()
@@ -981,17 +1087,17 @@ def preprocessing_ieeg(data, chan_list, srate, prep_step, trial_i, ref_type):
 
     #### export raw PSD
     fig, ax = plt.subplots(figsize=(10,8))
-    for chan_i, chan in enumerate(chan_list):
+    for chan_i, chan in enumerate(chanlist):
         x = data_preproc[chan_i]
         frex, Pxx = scipy.signal.welch(x, fs=srate, nperseg=int(srate * 4))
         ax.semilogy(frex, Pxx, label=chan)
     plt.legend()
     # plt.show()
-    fig.savefig(os.path.join(path_results, 'Pxx', 'raw_preproc', f"{sujet}_POST_t{trial_i}_{ref_type}.png"))
+    fig.savefig(os.path.join(path_results, 'Pxx', 'PSD_preproc', f"{sujet}_PREP_t{trial_i}_{ref_type}.png"))
 
     plt.close('all')
 
-    return data_preproc
+    return data_preproc, resp
 
 
 
@@ -1004,55 +1110,28 @@ def preprocessing_ieeg(data, chan_list, srate, prep_step, trial_i, ref_type):
 ######## EXPORT ########
 ################################
 
-def export_data(sujet, data_preproc_alltrial, resp_alltrial, oc_trigger_alltrial, respfeature_alltrial, chanlist, ref_type):
+def export_data(sujet, data_preproc_alltrial, resp_alltrial, ref_type):
 
     print('#### SAVE ####')
 
     #### config
     path_export = os.path.join(path_prep, 'export', sujet)
-    path_export_respfeatures = os.path.join(path_precompute, 'respi', 'respfeatures')
+
+    chanlist, localist = get_chanlocalist(sujet, ref_type)
 
     for trial_i, trial in enumerate(trial_list_dict[sujet]):
     
         #### agregate data
         data_all = np.concat([data_preproc_alltrial[trial_i], resp_alltrial[trial_i].reshape(1,-1)], axis=0)
-        chanlist_all = chanlist.copy()
+        chanlist_all = chanlist.copy().tolist()
         chanlist_all.append('resp')
         xr_dict = {'chan' : chanlist_all, 'time' : np.arange(data_all.shape[-1])/srate}
         xr_data_export = xr.DataArray(data=data_all, dims=xr_dict.keys(), coords=xr_dict)
-
-        #### save
-        df_oc_trig = pd.DataFrame({'oc_trig' : oc_trigger_alltrial[trial_i]})
-
         xr_data_export.to_netcdf(os.path.join(path_export, f"{sujet}_trial{trial_i+1}_preproc_{ref_type}.nc"))    
-        df_oc_trig.to_excel(os.path.join(path_export, f"{sujet}_trial{trial_i+1}_oc_trig_{ref_type}.xlsx"))
-        
-
-    #### save chanlist + respfeatures
-    df_chanlist = pd.DataFrame({'chanlist' : chanlist})
-
-    df_chanlist.to_excel(os.path.join(path_export, f"{sujet}_chanlist_{ref_type}.xlsx"))
-
-    respfeature_alltrial.to_excel(os.path.join(path_export_respfeatures, f"{sujet}_respfeatures.xlsx"))
-
-
-
         
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+        
 
 
 
@@ -1073,14 +1152,13 @@ def export_data(sujet, data_preproc_alltrial, resp_alltrial, oc_trigger_alltrial
 
 if __name__== '__main__':
 
+    #ref_type = 'mn'
+    for ref_type in ref_type_list:
 
-    #sujet = sujet_list[0]
-    for sujet in sujet_list:
+        #sujet = sujet_list[0]
+        for sujet in sujet_list:
 
-        print(f"{sujet}")
-
-        #ref_type = 'bi'
-        for ref_type in ref_type_list:
+            print(f"{sujet} {ref_type}")
         
             #### verify computing
             path_export_prep = os.path.join(path_prep, 'export', sujet)
@@ -1089,51 +1167,20 @@ if __name__== '__main__':
                 print('ALREADY COMPUTED')
                 continue
 
-
-            ################################
-            ######## EXTRACT DATA ########
-            ################################
-
-            data_ieeg_alltrial_raw, resp_alltrial, oc_trigger_alltrial, respfeature_alltrial, chanlist = extract_data(sujet)   
-
-            if ref_type == 'bi':
-                data_ieeg_alltrial_raw, chanlist = bipolar_ref(data_ieeg_alltrial_raw)
-
-            #### export
-            path_export = os.path.join(path_prep, 'export', sujet)
-
-            for trial_i, trial in enumerate(trial_list_dict[sujet]):
-            
-                #### agregate data
-                data_all = np.concat([data_ieeg_alltrial_raw[trial_i], resp_alltrial[trial_i].reshape(1,-1)], axis=0)
-                chanlist_all = chanlist.copy()
-                chanlist_all.append('resp')
-                xr_dict = {'chan' : chanlist_all, 'time' : np.arange(data_all.shape[-1])/srate}
-                xr_data_export = xr.DataArray(data=data_all, dims=xr_dict.keys(), coords=xr_dict)
-        
-                #### save
-                xr_data_export.to_netcdf(os.path.join(path_export, f"{sujet}_trial{trial_i+1}_raw_{ref_type}.nc"))
-
-
-            ################################
-            ######## LOCAFILE ########
-            ################################
-
-            generate_locafile(sujet, chanlist, f"{sujet}_locafile_raw_{ref_type}.xlsx")
-        
-
             ########################################
             ######## PREPROCESSING & EXPORT ########
             ########################################
 
             data_preproc_alltrial = []
+            resp_alltrial = []
 
             for trial_i, trial in enumerate(trial_list_dict[sujet]):
 
-                data_preproc = preprocessing_ieeg(data_ieeg_alltrial_raw[trial_i], chanlist, srate, prep_step_wb, trial_i, ref_type)
+                data_preproc, resp = preprocessing_ieeg(sujet, trial_i, srate, prep_step_wb, ref_type)
                 data_preproc_alltrial.append(data_preproc)
+                resp_alltrial.append(resp)
 
-            export_data(sujet, data_preproc_alltrial, resp_alltrial, oc_trigger_alltrial, respfeature_alltrial, chanlist, ref_type)
+            export_data(sujet, data_preproc_alltrial, resp_alltrial, ref_type)
 
 
 

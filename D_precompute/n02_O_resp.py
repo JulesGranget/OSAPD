@@ -305,7 +305,7 @@ def extract_mean_figures_stretch(sujet):
 
 if __name__ == '__main__':
 
-    #sujet = sujet_list[0]
+    #sujet = sujet_list[7]
     for sujet in sujet_list:
 
         extract_stretch_resp(sujet)

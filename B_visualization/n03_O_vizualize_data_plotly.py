@@ -226,9 +226,9 @@ if __name__ == '__main__':
     trial_i = 0
     ref_type = 'mn'
 
-    chanlist, localist = get_chanlocalist(sujet, ref_type)
+    chanlist = get_chanlist_raw(sujet, ref_type)
 
-    xr_data = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_raw.nc"))
+    xr_data = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_raw_{ref_type}.nc"))
 
     #### raw
     plot_xr_channels(xr_data, chan_start=0, n_chan=16, target_srate=100, srate=500, offset=4, include_resp=True, norm_method_ieeg=None, norm_method_resp="zscore", vlines=None, title=None,)

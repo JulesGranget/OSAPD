@@ -329,12 +329,12 @@ if __name__ == '__main__':
 
     #### PRECOMPUTE
     norm_param = 'rscore'
-    
-    #sujet = sujet_list[0]
-    for sujet in sujet_list:
 
-        #ref_type = 'bi'
-        for ref_type in ref_type_list:
+    #ref_type = 'bi'
+    for ref_type in ref_type_list:
+    
+        #sujet = sujet_list[7]
+        for sujet in sujet_list:
 
             extract_stretch_TF_raw(sujet, norm_param, ref_type)
             extract_power(sujet, ref_type)

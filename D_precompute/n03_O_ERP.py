@@ -562,10 +562,10 @@ def get_perm_stats_HFA(sujet, ref_type):
 
 if __name__ == '__main__':
 
-    #sujet = sujet_list[0]
+    #sujet = sujet_list[3]
     for sujet in sujet_list:
 
-        #ref_type = 'mn'
+        #ref_type = 'bi'
         for ref_type in ref_type_list:
 
             print(f'#### {sujet} ####', flush=True)

@@ -16,7 +16,7 @@ srate = 500
 
 sujet_pilot = ['test']
 
-sujet_list = ['P01', 'P02', 'P03', 'P04']
+sujet_list = ['P01', 'P02', 'P03', 'P04', 'P05', 'P07', 'P08', 'P09', 'P10']
 
 
 conditions_oc = ['oc300', 'oc600']
@@ -78,7 +78,7 @@ prep_step_wb = {
 'average_reref' : {'execute': False},
 }
 
-bipolarize_chan_i_lim = 8 #non zero based
+bipolarize_chan_i_lim = [7, 15] #non zero based
 
 
 ################################

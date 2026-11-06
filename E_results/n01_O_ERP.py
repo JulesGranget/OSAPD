@@ -259,7 +259,7 @@ def plot_ERP_res(sujet, ref_type):
 
 if __name__ == '__main__':
 
-    #sujet = sujet_list[0]
+    #sujet = sujet_list[3]
     for sujet in sujet_list:
 
         #ref_type = 'mn'

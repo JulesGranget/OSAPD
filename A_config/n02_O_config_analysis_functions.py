@@ -156,7 +156,7 @@ def load_trial_data_sujet(sujet, trial):
 
 def get_chanlocalist(sujet, ref_type):
 
-    path_load_loca = os.path.join(path_prep, 'anatomy', sujet, f"{sujet}_locafile_{ref_type}.xlsx")
+    path_load_loca = os.path.join(path_prep, 'anatomy', f"{sujet}_locafile_{ref_type}.xlsx")
     df_localist_raw = pd.read_excel(path_load_loca)
     df_localist_sel = df_localist_raw.query(f"select == 1")
     localist = df_localist_sel
@@ -164,6 +164,16 @@ def get_chanlocalist(sujet, ref_type):
 
     return chanlist, localist
 
+
+
+def get_chanlist_raw(sujet, ref_type):
+
+    path_load_loca = os.path.join(path_prep, 'anatomy', f"{sujet}_locafile_raw_{ref_type}.xlsx")
+    df_localist_raw = pd.read_excel(path_load_loca)
+    df_localist_sel = df_localist_raw.query(f"select == 1")
+    chanlist = df_localist_sel['chan'].values
+
+    return chanlist
 
 
 
@@ -182,17 +192,6 @@ def get_alltrials_sujet(sujet, ref_type):
         
     return data_alltrial, oc_list_alltrial
 
-
-
-
-
-
-def get_df_loca(sujet):
-
-    path_plotloca = os.path.join(path_prep, sujet, 'anatomy', f"{sujet}_plot_loca.xlsx")
-    df_loca = pd.read_excel(path_plotloca)
-
-    return df_loca
 
 
 

@@ -182,47 +182,50 @@ if __name__ == '__main__':
     ######## CONFIG ########
     ################################
 
-    sujet = 'P01'
+    
+    ref_type = 'mn'
+
+    #sujet_list
+    sujet = 'P02'
     trial_i = 0
+
+    chanlist = get_chanlist_raw(sujet, ref_type)
 
     srate = 500
     target_srate = 100
-
     
-
-    offset = 200
+    offset = 800
 
     ################################
     ######## LOAD DATA ########
     ################################
 
-    xr_data = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_raw.nc"))
-    xr_data_preproc = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_preproc.nc"))
-    xr_data_bi = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_raw_bi.nc"))
-    xr_data_preproc_bi = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_preproc_bi.nc"))
+    xr_data = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_raw_{ref_type}.nc"))
 
-    
 
-    plt.plot(xr_data.data[0,:])
-    plt.plot(xr_data.data[5,:])
-    plt.show()
+    # xr_data_preproc = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_preproc.nc"))
+    # xr_data_bi = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_raw_bi.nc"))
+    # xr_data_preproc_bi = xr.open_dataarray(os.path.join(path_prep, 'export', sujet, f"{sujet}_trial{trial_i+1}_preproc_bi.nc"))
+
 
 
     ################################
     ######## VISU ########
     ################################
 
-    plot_xr_channels_matplotlib(xr_data, chan_start=0, n_chan=16, target_srate=target_srate, srate=srate, offset=offset, include_resp=True,
-                                norm_method_ieeg=None, norm_method_resp="zscore", resp_amp=40, vlines=None, title=f"{sujet} trial {trial_i+1} RAW")
+    plot_xr_channels_matplotlib(xr_data, chan_start=0, n_chan=len(chanlist), target_srate=target_srate, srate=srate, offset=offset, include_resp=True,
+                                norm_method_ieeg=None, norm_method_resp=None, resp_amp=40, vlines=None, title=f"{sujet} trial {trial_i+1} RAW")
 
-    plot_xr_channels_matplotlib(xr_data_preproc, chan_start=0, n_chan=16, target_srate=target_srate, srate=srate, offset=offset, include_resp=True,
-                                norm_method_ieeg=None, norm_method_resp="zscore", resp_amp=40, vlines=None, title=f"{sujet} trial {trial_i+1} PREPROC")
-
-    plot_xr_channels_matplotlib(xr_data_bi, chan_start=0, n_chan=16, target_srate=target_srate, srate=srate, offset=offset, include_resp=True,
-                                    norm_method_ieeg=None, norm_method_resp="zscore", resp_amp=40, vlines=None, title=f"{sujet} trial {trial_i+1} BI")
     
-    plot_xr_channels_matplotlib(xr_data_preproc_bi, chan_start=0, n_chan=16, target_srate=target_srate, srate=srate, offset=offset, include_resp=True,
-                                norm_method_ieeg=None, norm_method_resp="zscore", resp_amp=40, vlines=None, title=f"{sujet} trial {trial_i+1} PREPROC BI")
+
+    # plot_xr_channels_matplotlib(xr_data_preproc, chan_start=0, n_chan=16, target_srate=target_srate, srate=srate, offset=offset, include_resp=True,
+    #                             norm_method_ieeg=None, norm_method_resp="zscore", resp_amp=40, vlines=None, title=f"{sujet} trial {trial_i+1} PREPROC")
+
+    # plot_xr_channels_matplotlib(xr_data_bi, chan_start=0, n_chan=16, target_srate=target_srate, srate=srate, offset=offset, include_resp=True,
+    #                                 norm_method_ieeg=None, norm_method_resp="zscore", resp_amp=40, vlines=None, title=f"{sujet} trial {trial_i+1} BI")
+    
+    # plot_xr_channels_matplotlib(xr_data_preproc_bi, chan_start=0, n_chan=16, target_srate=target_srate, srate=srate, offset=offset, include_resp=True,
+    #                             norm_method_ieeg=None, norm_method_resp="zscore", resp_amp=40, vlines=None, title=f"{sujet} trial {trial_i+1} PREPROC BI")
 
 
 
