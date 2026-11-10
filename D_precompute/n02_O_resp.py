@@ -104,7 +104,7 @@ def extract_ERP_resp(sujet):
             print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
             continue
         else:
-            print(f'#### TF PRECOMPUTE {sujet} {cond} ####', flush=True)
+            print(f'#### PRECOMPUTE {sujet} {cond} ####', flush=True)
 
         trial_i_list_cond = [trial_i for trial_i, trial_cond in enumerate(trial_list_dict[sujet]) if trial_cond.find(cond) != -1]
         erp_cond = []
@@ -291,6 +291,8 @@ def extract_mean_figures_stretch(sujet):
     # plt.show()
 
     fig_mean.savefig(os.path.join(path_export_mean_fig, f"{sujet}_stretch_mean.png"))
+
+    plt.close('all')
 
 
 

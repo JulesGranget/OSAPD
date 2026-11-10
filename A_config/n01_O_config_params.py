@@ -16,9 +16,9 @@ srate = 500
 
 sujet_pilot = ['test']
 
-sujet_list = ['P01', 'P02', 'P03', 'P04', 'P05', 'P07', 'P08', 'P09', 'P10']
+sujet_list = ['P01', 'P02', 'P03', 'P04', 'P05', 'P07', 'P08', 'P09', 'P10', 'P12', 'P13', 'P14']
 
-
+conditions = ['RB', 'oc300', 'oc600']
 conditions_oc = ['oc300', 'oc600']
 conditions_cycle = ['RB', 'O']
 conditions_dbs = ['on', 'off']
@@ -56,6 +56,7 @@ path_anatomy = os.path.join(path_general, 'Data', 'anatomy')
 path_precompute = os.path.join(path_general, 'Analyses', 'precompute') 
 path_results = os.path.join(path_general, 'Analyses', 'results') 
 path_memmap = os.path.join(path_general, 'memmap') 
+path_paper_figure_export = os.path.join(path_results, 'figure_paper')
 
 os.chdir(init_workdir)
 

@@ -124,7 +124,7 @@ if __name__ == '__main__':
     ref_type = 'mn'
 
     #sujet_list
-    sujet = 'P10'
+    sujet = 'P14'
     trial_i = 0
 
     chanlist = get_chanlist_raw(sujet, ref_type)

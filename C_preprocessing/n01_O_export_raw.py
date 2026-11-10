@@ -99,7 +99,7 @@ def sync_resp_ieeg(resp, ieeg, resp_trig, ieeg_trig, resp_srate, ieeg_srate, tar
 
 
 
-#sujet = sujet_list[8]
+#sujet = sujet_list[10]
 def extract_data(sujet):
 
     #### config
@@ -187,7 +187,7 @@ def extract_data(sujet):
     oc_trigger_alltrial = []
     respfeature_alltrial = []
 
-    #trial_i, trial_cond = 3, trial_list_dict[sujet][3]
+    #trial_i, trial_cond = 2, trial_list_dict[sujet][2]
     for trial_i, trial_cond in enumerate(trial_list_dict[sujet]):
 
         print(trial_i, trial_cond)
@@ -259,19 +259,31 @@ def extract_data(sujet):
 
             trig_ieeg = data_raw[f"{chan_trig_extraction}x00"].reshape(-1)
 
-            if sujet == 'P09' and trial_i in [1,2,3]:
+            if sujet in ['P09', 'P12', 'P13', 'P14']:
 
                 _trig_ieeg_filter = scipy.signal.savgol_filter(x=trig_ieeg, window_length=int(srate_ieeg*0.5), polyorder=1)
                 _separator_trig = (_trig_ieeg_filter.max() - _trig_ieeg_filter.min())/2
                 _trig_ieeg = ((_separator_trig < _trig_ieeg_filter)*1)*_trig_ieeg_filter.max()
+                modul_from_origin = 0
 
-                copy_paste_from_original_list = {1 : [[12000,16000], [886000,890000]], 2 : [[9000, 11000], [841500, 844000]], 3 : [[4000, 8000], [837000, 840000]]}
+                if sujet == 'P09' and trial_i in [1,2,3]:
+                    copy_paste_from_original_list = {1 : [[12000,16000], [886000,890000]], 2 : [[9000, 11000], [841500, 844000]], 3 : [[4000, 8000], [837000, 840000]]}
+                    modul_from_origin = 1
+                elif sujet == 'P12' and trial_i in [2, 3]:
+                    copy_paste_from_original_list = {2 : [[0, 30000]], 3 : [[4000, 8000], [837000, 840000]]}
+                    modul_from_origin = 1
+                elif sujet == 'P14' and trial_i in [2, 3]:
+                    copy_paste_from_original_list = {2 : [[0, 20000]], 3 : [[0, 20000]]}
+                    modul_from_origin = 1
 
-                for _start, _stop in copy_paste_from_original_list[trial_i]:
-                    _trig_ieeg[_start:_stop] = trig_ieeg[_start:_stop]
+                if modul_from_origin == 1:
+                    for _start, _stop in copy_paste_from_original_list[trial_i]:
+                        _trig_ieeg[_start:_stop] = trig_ieeg[_start:_stop]
 
-                if trial_i == 2:
+                if sujet == 'P09' and trial_i == 2:
                     _trig_ieeg[:6000] = _trig_ieeg[6000]
+                if sujet == 'P12' and trial_i == 3:
+                    _trig_ieeg[260000:380000] = _trig_ieeg[0]
 
                 if debug:
                     plt.plot(trig_ieeg)
@@ -337,6 +349,9 @@ def extract_data(sujet):
         data_ieeg_chunked = data_ieeg[:,trig_to_chunk_ieeg[0]:trig_to_chunk_ieeg[-1]]
         data_trig_ieeg = data_trig_ieeg_cleaned_short - data_trig_ieeg_cleaned_short[0]
 
+        if sujet == 'P12' and trial_i == 3:
+            data_trig_ieeg = np.sort(np.append(data_trig_ieeg, [91.54, 92.8, 102.86, 104.45]))
+
         if debug:
 
             time_vec_ieeg = np.arange(data_ieeg.shape[-1])/srate_ieeg
@@ -383,7 +398,7 @@ def extract_data(sujet):
         if debug:
 
             shift = shift_all_patient[sujet][f"trial{trial_i}"]
-            shift = 0
+            shift = -0.5
 
             time_vec = np.arange(resp_chunk.size)/srate_SL
             plt.plot(time_vec, resp_chunk)
@@ -397,6 +412,9 @@ def extract_data(sujet):
         data_trig_ieeg_corrected = data_trig_ieeg+shift
         exclude_before_zero = 0 <= data_trig_ieeg_corrected
         data_trig_ieeg_corrected = data_trig_ieeg_corrected[exclude_before_zero]
+
+        if sujet == 'P13' and trial_i in [0, 1, 2, 3]:
+            data_trig_ieeg_corrected = np.sort(np.append(data_trig_ieeg_corrected, 0))
 
         data_trig_ieeg_corrected_final = []
         trigger_SL_trial_corrected_final = []
@@ -479,8 +497,9 @@ def extract_data(sujet):
         cycles_raw = physio.detect_respiration_cycles(resp_resampled, srate, method="crossing_baseline", baseline_mode='zero')
 
         if sujet == 'P07':
-
             cycles_raw = physio.detect_respiration_cycles(resp_clean_smooth, srate, method="crossing_baseline", baseline_mode='zero')
+        elif sujet == 'P14':
+            cycles_raw = physio.detect_respiration_cycles(resp_clean_smooth-0.4, srate, method="crossing_baseline", baseline_mode='zero')
 
         #### verify cycle detection
         if debug:
@@ -799,7 +818,7 @@ if __name__== '__main__':
     #ref_type = 'mn'
     for ref_type in ref_type_list:
 
-        #sujet = sujet_list[0]
+        #sujet = sujet_list[9]
         for sujet in sujet_list:
 
             print(f"{sujet} {ref_type}")
@@ -807,7 +826,7 @@ if __name__== '__main__':
             #### verify computing
             path_export_prep = os.path.join(path_prep, 'export', sujet)
 
-            if os.path.exists(os.path.join(path_export_prep, f'{sujet}_trial1_preproc_{ref_type}.nc')):
+            if os.path.exists(os.path.join(path_export_prep, f'{sujet}_trial1_raw_{ref_type}.nc')):
                 print('ALREADY COMPUTED')
                 continue
 

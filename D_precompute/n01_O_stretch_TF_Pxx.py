@@ -17,26 +17,28 @@ import joblib
 ######## PRECOMPUTE TF ########
 ################################
 
-#sujet, norm_param, ref_type = sujet_list[0], 'rscore', 'bi'
+#sujet, norm_param, ref_type = sujet_list[0], 'rscore', 'mn'
 def extract_stretch_TF_raw(sujet, norm_param, ref_type):
 
     #### config
-    path_export_TF = os.path.join(path_precompute, 'TF', sujet)
+    path_export_TF = os.path.join(path_precompute, 'TF')
+
+    if os.path.exists(os.path.join(path_export_TF, f"{sujet}_RB_tf_stretch_{ref_type}.nc")):
+        print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
+        return
 
     #### load
     data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet, ref_type)
     respfeatures = get_respfeatures(sujet)
     chanlist, localist = get_chanlocalist(sujet, ref_type)
 
+    xr_dict_allcond = {cond : [] for cond in conditions}
+
     #### precompute
     #cond = conditions_oc[0]
     for cond in conditions_oc:
 
-        if os.path.exists(os.path.join(path_export_TF, f"{sujet}_{cond}_tf_stretch_{ref_type}.nc")):
-            print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
-            continue
-        else:
-            print(f'#### TF PRECOMPUTE {sujet} {cond} ####', flush=True)
+        print(f'#### TF PRECOMPUTE {sujet} {cond} ####', flush=True)
 
         trial_i_list_cond = [trial_i for trial_i, trial_cond in enumerate(trial_list_dict[sujet]) if trial_cond.find(cond) != -1]
         tf_stretch_cond = []
@@ -184,6 +186,13 @@ def extract_stretch_TF_raw(sujet, norm_param, ref_type):
 
             tf_allchan_stretch = np.array(tf_allchan_stretch)
 
+            dict_xr_tf_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'cycle' : np.arange(tf_allchan_stretch.shape[1]), 
+                                 'cycle_trial' : ('cycle', [trial_i]*tf_allchan_stretch.shape[1]), 'freq' : frex, 'phase' : np.arange(stretch_point_TF)} 
+            xr_tf_stretch = xr.DataArray(tf_allchan_stretch, dims=("chan", "cycle", "freq", "phase"), coords=dict_xr_tf_coords)
+
+            xr_dict_allcond['RB'].append(xr_tf_stretch.sel(cycle=respfeatures.query(f"trial == {trial_i} and oc_id == 0")['cycle'].values))
+            xr_dict_allcond[cond].append(xr_tf_stretch.sel(cycle=respfeatures.query(f"trial == {trial_i} and oc_id == 0")['cycle'].values))
+
             resp_stretch = stretch_data(respfeature_trial, stretch_point_TF, resp, srate)[0]
 
             if debug:
@@ -193,25 +202,21 @@ def extract_stretch_TF_raw(sujet, norm_param, ref_type):
 
                 plt.pcolormesh(np.median(tf_allchan_stretch[0], axis=[0]))
                 plt.show()
+    
+    #### save stretch tf
+    print(f'SAVE TF STRETCH {sujet} {cond}', flush=True)
 
-            tf_stretch_cond.append(tf_allchan_stretch)
+    for cond in conditions:
 
-        #### concat
-        tf_stretch_cond = np.concat(tf_stretch_cond, axis=1)
+        xr_export = xr.concat(xr_dict_allcond[cond], dim='cycle')
+        xr_export.to_netcdf(os.path.join(path_export_TF, f"{sujet}_{cond}_tf_stretch_{ref_type}.nc"))
 
-        #### save stretch tf
-        print(f'SAVE TF STRETCH {sujet} {cond}', flush=True)
-        dict_xr_tf_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'cycle' : np.arange(tf_stretch_cond.shape[1]), 'freq' : frex, 'phase' : np.arange(stretch_point_TF)} 
-        xr_tf_stretch_export = xr.DataArray(tf_stretch_cond, dims=("chan", "cycle", "freq", "phase"), coords=dict_xr_tf_coords)
+    #### remove
+    os.remove(os.path.join(path_memmap, f'memmap_{sujet}_{trial_i}_tf_conv.npy'))
+    os.remove(os.path.join(path_memmap, f'memmap_{sujet}_{trial_i}_rscore_param.npy'))
+    os.remove(os.path.join(path_memmap, f'memmap_{sujet}_{trial_i}_tf_conv_norm.npy'))
 
-        xr_tf_stretch_export.to_netcdf(os.path.join(path_export_TF, f"{sujet}_{cond}_tf_stretch_{ref_type}.nc"))
-
-        #### remove
-        os.remove(os.path.join(path_memmap, f'memmap_{sujet}_{trial_i}_tf_conv.npy'))
-        os.remove(os.path.join(path_memmap, f'memmap_{sujet}_{trial_i}_rscore_param.npy'))
-        os.remove(os.path.join(path_memmap, f'memmap_{sujet}_{trial_i}_tf_conv_norm.npy'))
-
-        del tf_allconv, rscore_param, tf_allconv_norm
+    del tf_allconv, rscore_param, tf_allconv_norm
 
 
 
@@ -251,30 +256,28 @@ def extract_power(sujet, ref_type):
                     for band, freq in freq_band_dict.items()}
     
     #### load
-    path_load_precompute_tf = os.path.join(path_precompute, 'TF', sujet)
+    path_load_precompute_tf = os.path.join(path_precompute, 'TF')
 
     #### extract Pxx
-    xr_Pxx = []
-
-    for cond in conditions_oc:
+    for cond in conditions:
 
         print(f"{cond}")
 
         #### load
         xr_tf = xr.open_dataarray(os.path.join(path_load_precompute_tf, f"{sujet}_{cond}_tf_stretch_{ref_type}.nc"))
+        cycle_id = xr_tf['cycle'].values
+        cycle_trial = xr_tf['cycle_trial'].values
 
         #### extract
         Pxx_cond = np.zeros((1, xr_tf['chan'].shape[0], len(bands), len(phases), xr_tf['cycle'].shape[0]), dtype=np.float32)
 
         for chan_i, chan_name in enumerate(chanlist):
 
-            ncycle = xr_tf['cycle'].shape[0]
-
-            for cycle_i in range(ncycle):
+            for cycle_i in range(xr_tf['cycle'].shape[0]):
 
                 for band_i, (band, frex_sel) in enumerate(band_frex_sel.items()):
 
-                    _tf = xr_tf.sel(chan=chan_name, cycle=cycle_i, freq=frex[frex_sel]).values
+                    _tf = xr_tf.sel(chan=chan_name, freq=frex[frex_sel]).isel(cycle=cycle_i).values
 
                     pxx_inspi = np.median(_tf[:, inspi_sel])
                     pxx_expi  = np.median(_tf[:, expi_sel])
@@ -282,35 +285,25 @@ def extract_power(sujet, ref_type):
                     Pxx_cond[0, chan_i, band_i, 0, cycle_i] = pxx_inspi
                     Pxx_cond[0, chan_i, band_i, 1, cycle_i] = pxx_expi
 
-        xr_Pxx.append(Pxx_cond)
+        #### construct xr
+        da_Pxx = xr.DataArray(
+            Pxx_cond,
+            dims=("sujet", "chan", "band", "phase", "cycle"),
+            coords={
+                "sujet" : [sujet],
+                "chan": chanlist,
+                "ROI": ("chan", localist['loca_modified'].values), 
+                "band": bands,
+                "phase": phases,
+                "cycle": np.arange(cycle_id.shape[0]),
+                "cycle_id": ("cycle", cycle_id), 
+                "cycle_trial": ("cycle", cycle_trial), 
+            },
+            name="Pxx"
+        )
 
-    #### construct xr
-    max_cycle = np.array([_Pxx.shape[-1] for _Pxx in xr_Pxx]).max()
-    xr_Pxx_data = np.full((1, len(conditions_oc), xr_tf['chan'].shape[0], len(bands), len(phases), max_cycle), np.nan, dtype=np.float32)
-
-    for cond_i, cond in enumerate(conditions_oc):
-        
-        cond_max_cycle = xr_Pxx[cond_i].shape[-1]
-        xr_Pxx_data[0,cond_i,:,:,:,:cond_max_cycle] = xr_Pxx[cond_i]
-
-    da_Pxx = xr.DataArray(
-        xr_Pxx_data,
-        dims=("sujet", "cond", "chan", "band", "phase", "cycle"),
-        coords={
-            "sujet" : [sujet],
-            "cond": conditions_oc,
-            "chan": chanlist,
-            "ROI": ("chan", localist['loca_modified'].values), 
-            "band": bands,
-            "phase": phases,
-            "cycle": np.arange(max_cycle),
-        },
-        name="Pxx"
-    )
-
-    #### SAVE
-    print('SAVE EXTRACT PXX', flush=True)
-    da_Pxx.to_netcdf(os.path.join(path_export_Pxx, f'{sujet}_xr_Pxx_{ref_type}.nc')) 
+        #### SAVE
+        da_Pxx.to_netcdf(os.path.join(path_export_Pxx, f'{sujet}_{cond}_xr_Pxx_{ref_type}.nc')) 
 
     print('done', flush=True)
 
@@ -330,7 +323,7 @@ if __name__ == '__main__':
     #### PRECOMPUTE
     norm_param = 'rscore'
 
-    #ref_type = 'bi'
+    #ref_type = 'mn'
     for ref_type in ref_type_list:
     
         #sujet = sujet_list[7]

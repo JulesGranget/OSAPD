@@ -788,7 +788,7 @@ def compare_pre_post(data_pre, data_post, chanlist, srate, chan_name):
 ######## PREPROCESSING ########
 ################################
 
-#data, chan_list, srate, prep_step, trial_i, ref_type = data_ieeg_alltrial_raw[trial_i], chanlist, srate, prep_step_wb, trial_i, ref_type
+#sujet, trial_i, srate, prep_step, ref_type = sujet, trial_i, srate, prep_step_wb, ref_type
 def preprocessing_ieeg(sujet, trial_i, srate, prep_step, ref_type):
 
     print('#### PREPROCESSING ####')

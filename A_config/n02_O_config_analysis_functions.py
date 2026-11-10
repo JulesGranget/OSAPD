@@ -194,9 +194,21 @@ def get_alltrials_sujet(sujet, ref_type):
 
 
 
+def get_df_loca(sujet, ref_type):
+
+    path_load_loca = os.path.join(path_prep, 'anatomy', f"{sujet}_locafile_{ref_type}.xlsx")
+    df_localist_raw = pd.read_excel(path_load_loca)
+    df_localist_sel = df_localist_raw.query(f"select == 1")
+
+    return df_localist_sel
 
 
+def get_df_loca_allsujet(ref_type):
 
+    df_localist_allsujet_raw = pd.concat([pd.read_excel(os.path.join(path_prep, 'anatomy', f"{sujet}_locafile_{ref_type}.xlsx")) for sujet in sujet_list])
+    df_localist_allsujet_sel = df_localist_allsujet_raw.query(f"select == 1")
+
+    return df_localist_allsujet_sel
 
 
 ########################################

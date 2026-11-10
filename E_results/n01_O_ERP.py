@@ -11,22 +11,24 @@ import plotly.graph_objects as go
 import matplotlib.colors as mcolors
 
 
-################################
-######## ERP PLOT ########
-################################
+########################################
+######## ERP PLOT SUJET WISE ########
+########################################
 
 
 
-def plot_ERP_res(sujet, ref_type):
+def plot_ERP_res_sujet(sujet, ref_type):
+
+    print(sujet, ref_type_listf)
 
     #### config
-    path_export_fig = os.path.join(path_results, 'ERP', sujet)
+    path_export_fig = os.path.join(path_results, 'ERP')
 
     freq_cond_list = ['WB', 'HFA']
     conditions_sel = ['RB', 'oc300', 'oc600']
     time_vec_ERP = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
     time_vec_plot = (-1 < time_vec_ERP) & (time_vec_ERP < 2)
-    path_load = os.path.join(path_precompute, 'ERP', sujet)
+    path_load = os.path.join(path_precompute, 'ERP')
     chanlist, localist = get_chanlocalist(sujet, ref_type)
 
     ### load ERP
@@ -249,6 +251,102 @@ def plot_ERP_res(sujet, ref_type):
 
 
 
+########################################
+######## ERP PLOT POPULATION ########
+########################################
+
+
+
+def plot_ERP_res_pop(ref_type):
+
+    #### config
+    path_export_fig = os.path.join(path_results, 'ERP', 'population')
+
+    freq_cond_list = ['WB', 'HFA']
+    time_vec_ERP = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
+    time_vec_plot = (-1 < time_vec_ERP) & (time_vec_ERP < 2)
+    path_load = os.path.join(path_precompute, 'ERP')
+
+    df_loca_allsujet = get_df_loca_allsujet(ref_type)
+
+    ROI_list = df_loca_allsujet['loca_modified'].unique()
+
+    #### ROI computation
+    for ROI in ROI_list:
+
+        sujet_list_ROI = df_loca_allsujet.query(f"loca_modified == '{ROI}'")['sujet'].unique()
+
+        for freq_type in freq_cond_list:
+
+            #### get sujet extraction params
+            ROI_erp = {}
+
+            for cond in conditions:
+
+                ROI_erp[cond] = []
+            
+                for sujet in sujet_list_ROI:
+
+                    xr_erp_data = xr.open_dataarray(os.path.join(path_load, f"{sujet}_{cond}_{freq_type}_erp_{ref_type}.nc"))
+                    chanlist_extraction = df_loca_allsujet.query(f"loca_modified == '{ROI}' and sujet == '{sujet}'")['chan'].values
+                    xr_erp_data_chansel = xr_erp_data.sel(chan=chanlist_extraction)
+                    erp_median = xr_erp_data_chansel.median('epoch').median('chan').values
+
+                    ROI_erp[cond].append(erp_median)
+
+                ROI_erp[cond] = np.vstack(ROI_erp[cond])
+
+            #### extract vlims
+            min = np.array([ROI_erp[cond].min() for cond in conditions]).min()
+            max = np.array([ROI_erp[cond].max() for cond in conditions]).max()
+           
+            #### plot
+            # cond_color = {'RB' : 'g', 'oc300' : 'k', 'oc600' : 'r'}
+            cond_color = {"RB": "blue", "oc300": "orange", "oc600": "red"}
+
+            fig = go.Figure()
+
+            for cond in conditions:
+
+                y = np.median(ROI_erp[cond], axis=0)[time_vec_plot]
+
+                fig.add_scatter(
+                    x=time_vec_ERP[time_vec_plot],
+                    y=y,
+                    mode="lines",
+                    name=cond,
+                    line=dict(color=cond_color[cond])
+                )
+
+            #### vertical line at t = 0
+            fig.add_shape(
+                type="line",
+                x0=0, x1=0,
+                y0=0, y1=1,
+                xref="x",
+                yref="paper",
+                line=dict(color="black", dash="dash", width=1)
+            )
+
+            #### layout
+            fig.update_layout(
+                title=f"ROI:{ROI}, {freq_type}, p{ROI_erp[cond].shape[0]}",
+                template="simple_white",
+                xaxis_title="Time (s)",
+                yaxis_title="Amplitude",
+                width=750,
+                height=400
+            )
+
+            # fig.show()
+
+            fig.write_html(os.path.join(path_export_fig, f"ERP_{ROI}_{ref_type}.html"))
+
+
+                    
+
+
+
 
 
 
@@ -259,12 +357,14 @@ def plot_ERP_res(sujet, ref_type):
 
 if __name__ == '__main__':
 
-    #sujet = sujet_list[3]
-    for sujet in sujet_list:
+    #ref_type = 'mn'
+    for ref_type in ref_type_list:
 
-        #ref_type = 'mn'
-        for ref_type in ref_type_list:
+        #### Patient wise
+        #sujet = sujet_list[3]
+        for sujet in sujet_list:
 
-            plot_ERP_res(sujet, ref_type)
+            plot_ERP_res_sujet(sujet, ref_type)
 
-    
+        #### Population wise
+        plot_ERP_res_pop(ref_type)

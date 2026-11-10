@@ -26,25 +26,29 @@ debug = False
 def epoch_ERP_wb(sujet, ref_type):
 
     #### config
-    path_export_ERP = os.path.join(path_precompute, 'ERP', sujet)
+    path_export_ERP = os.path.join(path_precompute, 'ERP')
+    
+
+    if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_RB_WB_erp_{ref_type}.nc")):
+        print(f'{sujet} ALREADY COMPUTED', flush=True)
+        return
 
     #### load
     data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet, ref_type)
     # respfeatures = get_respfeatures(sujet)
     chanlist, localist = get_chanlocalist(sujet, ref_type)
 
+    respfeatures = get_respfeatures(sujet)
+
+    dict_data_allcond = {cond : [] for cond in conditions}
+
     #### precompute OC
     #cond = conditions_oc[0]
     for cond in conditions_oc:
 
-        if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_{cond}_WB_erp_{ref_type}.nc")):
-            print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
-            continue
-        else:
-            print(f'#### TF PRECOMPUTE {sujet} {cond} ####', flush=True)
+        print(f'#### ERP PRECOMPUTE {sujet} {cond} ####', flush=True)
 
         trial_i_list_cond = [trial_i for trial_i, trial_cond in enumerate(trial_list_dict[sujet]) if trial_cond.find(cond) != -1]
-        erp_cond = []
 
         #trial_i = trial_i_list_cond[0]
         for trial_i in trial_i_list_cond:
@@ -82,7 +86,7 @@ def epoch_ERP_wb(sujet, ref_type):
             oc_list_trial = (oc_list_alltrial[trial_i]['oc_trig'].values*srate).astype('int')
             chunk_time_prepost_i = int(chunk_time_prepost*srate)
 
-            epoch_trial = []
+            epoch_trial_cond = []
 
             for epoch_i, epoch_trig in enumerate(oc_list_trial):
 
@@ -92,97 +96,41 @@ def epoch_ERP_wb(sujet, ref_type):
                     continue
 
                 else:
-                    epoch_trial.append(data_ieeg_filt_norm[:,_start:_stop].reshape(chanlist.size, 1, -1))
+                    epoch_trial_cond.append(data_ieeg_filt_norm[:,_start:_stop].reshape(chanlist.size, 1, -1))
 
-            epoch_trial = np.concat(epoch_trial, axis=1)
-            erp_cond.append(epoch_trial)
+            epoch_trial_cond = np.concat(epoch_trial_cond, axis=1)
+            dict_data_allcond[cond].append(epoch_trial_cond)
+
+            #### RB
+            inspi_stats_RB = respfeatures.query(f"cond == '{cond}' and trial == {trial_i} and oc_id == 0")['inspi_index'].values
+
+            epoch_trial_RB = []
             
-        #### concat
-        erp_cond = np.concat(erp_cond, axis=1)
+            for epoch_i, epoch_trig in enumerate(inspi_stats_RB):
 
-        #### save stretch tf
-        print(f'SAVE ERP {sujet} {cond}', flush=True)
+                _start, _stop = epoch_trig - chunk_time_prepost_i, epoch_trig + chunk_time_prepost_i
+
+                if _start < 0 or data_ieeg_filt_norm.shape[-1] < _stop:
+                    continue
+
+                else:
+                    epoch_trial_RB.append(data_ieeg_filt_norm[:,_start:_stop].reshape(chanlist.size, 1, -1))
+
+            epoch_trial_RB = np.concat(epoch_trial_RB, axis=1)
+
+            dict_data_allcond['RB'].append(epoch_trial_RB)
+            
+    #### save
+    for cond in conditions:
 
         time_vec_epoch = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
-        dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'epoch' : np.arange(erp_cond.shape[1]), 'time' : time_vec_epoch} 
-        xr_erp_export = xr.DataArray(erp_cond, dims=("chan", "epoch", "time"), coords=dict_xr_erp_coords)
+        data_concat = np.concat(dict_data_allcond[cond], axis=1)
+        dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'epoch' : np.arange(data_concat.shape[1]), 'time' : time_vec_epoch} 
+        xr_erp_export = xr.DataArray(data_concat, dims=("chan", "epoch", "time"), coords=dict_xr_erp_coords)
 
         xr_erp_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_{cond}_WB_erp_{ref_type}.nc"))
 
-    #### precompute RB
-    cond = 'RB'
-    if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_RB_WB_erp_{ref_type}.nc")):
-        print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
-        return
-    else:
-        print(f'#### TF PRECOMPUTE {sujet} {cond} ####', flush=True)
-
-    erp_cond = []
-
-    respfeatures = get_respfeatures(sujet)
-
-    #trial_i, trial = 0, trial_list_dict[sujet][0]
-    for trial_i, trial in enumerate(trial_list_dict[sujet]):
-
-        #### data
-        data_ieeg = data_alltrial[trial_i].sel(chan=data_alltrial[trial_i]['chan'] != 'resp')
-        time_vec_trial = data_ieeg['time'].values
-
-        #### detrend + low pass 45Hz
-        data_ieeg_filt = []
-
-        for chan_i, chan in enumerate(chanlist):
-            x = scipy.signal.detrend(data_ieeg.sel(chan=chan).data, type='linear')
-            x = iirfilt(x, srate, lowcut=0.05, highcut=None)
-            x = iirfilt(x, srate, lowcut=None, highcut=45)
-            data_ieeg_filt.append(x)
-
-        data_ieeg_filt = np.array(data_ieeg_filt)
-
-        #### rscore
-        _med = np.median(data_ieeg_filt, axis=1)
-        _mad = scipy.stats.median_abs_deviation(data_ieeg_filt, axis=1)
-
-        data_ieeg_filt_norm = (data_ieeg_filt - _med[:, None]) * 0.6745 / _mad[:, None]
-
-        if debug:
-
-            chan_i = 0
-            plt.plot(data_ieeg.data[chan_i], label='raw')
-            plt.plot(data_ieeg_filt_norm[chan_i], label='filt_norm')
-            plt.legend()
-            plt.show()
-
-        #### inspi
-        inspi_starts_i_list = respfeatures.query(f"trial == {trial_i} and oc_id == 0")['inspi_index'].values
-        chunk_time_prepost_i = int(chunk_time_prepost*srate)
-
-        epoch_trial = []
-
-        for epoch_i, epoch_trig in enumerate(inspi_starts_i_list):
-
-            _start, _stop = epoch_trig - chunk_time_prepost_i, epoch_trig + chunk_time_prepost_i
-
-            if _start < 0 or data_ieeg_filt_norm.shape[-1] < _stop:
-                continue
-
-            else:
-                epoch_trial.append(data_ieeg_filt_norm[:,_start:_stop].reshape(chanlist.size, 1, -1))
-
-        epoch_trial = np.concat(epoch_trial, axis=1)
-        erp_cond.append(epoch_trial)
-        
-    #### concat
-    erp_cond = np.concat(erp_cond, axis=1)
-
-    #### save stretch tf
-    print(f'SAVE ERP {sujet} {cond}', flush=True)
-
-    time_vec_epoch = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
-    dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'epoch' : np.arange(erp_cond.shape[1]), 'time' : time_vec_epoch} 
-    xr_erp_export = xr.DataArray(erp_cond, dims=("chan", "epoch", "time"), coords=dict_xr_erp_coords)
-
-    xr_erp_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_RB_WB_erp_{ref_type}.nc"))
+    
 
 
 
@@ -192,24 +140,30 @@ def epoch_ERP_wb(sujet, ref_type):
 def epoch_ERP_HFA(sujet, ref_type, norm_token=None):
 
     #### config
-    path_export_ERP = os.path.join(path_precompute, 'ERP', sujet)
+    path_export_ERP = os.path.join(path_precompute, 'ERP')
+
+    if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_RB_HFA_erp_{ref_type}.nc")):
+        print(f'{sujet} ALREADY COMPUTED', flush=True)
+        return
 
     #### load
     data_alltrial, oc_list_alltrial = get_alltrials_sujet(sujet, ref_type)
+    # respfeatures = get_respfeatures(sujet)
     chanlist, localist = get_chanlocalist(sujet, ref_type)
 
+    respfeatures = get_respfeatures(sujet)
+
+    dict_data_allcond = {cond : [] for cond in conditions}
+
+    #### precompute OC
+    #cond = conditions_oc[0]
     for cond in conditions_oc:
 
-        if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_{cond}_HFA_erp.nc")):
-            print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
-            continue
-        else:
-            print(f'#### HFA PRECOMPUTE {sujet} {cond} ####', flush=True)
+        print(f'#### ERP PRECOMPUTE {sujet} {cond} ####', flush=True)
 
         trial_i_list_cond = [trial_i for trial_i, trial_cond in enumerate(trial_list_dict[sujet]) if trial_cond.find(cond) != -1]
 
-        hfa_cond = []
-
+        #trial_i = trial_i_list_cond[0]
         for trial_i in trial_i_list_cond:
 
             #### data
@@ -238,186 +192,67 @@ def epoch_ERP_HFA(sujet, ref_type, norm_token=None):
 
             data_hfa = np.array(data_hfa)
 
-            if debug:
-
-                plt.plot(data_hfa[0])
-                plt.show()
-
             #### rscore
             _med = np.median(data_hfa, axis=1)
-
             _mad = scipy.stats.median_abs_deviation(data_hfa, axis=1)
 
-            _mad[_mad == 0] = np.nan
-
-            data_hfa_norm = ((data_hfa - _med[:, None]) * 0.6745 / _mad[:, None])
+            data_ieeg_filt_norm = (data_hfa - _med[:, None]) * 0.6745 / _mad[:, None]
 
             if debug:
 
                 chan_i = 0
-
-                plt.figure(figsize=(12, 5))
-
-                plt.plot(data_hfa[chan_i], label='HFA power')
-                plt.plot(data_hfa_norm[chan_i], label='HFA power rscore')
+                plt.plot(data_ieeg.data[chan_i], label='raw')
+                plt.plot(data_ieeg_filt_norm[chan_i], label='filt_norm')
                 plt.legend()
                 plt.show()
 
-            #### sel method
-            if norm_token == 'rscore':
-                data_hfa_sel = data_hfa_norm
-            else:
-                data_hfa_sel = data_hfa
+            #### OC
+            oc_list_trial = (oc_list_alltrial[trial_i]['oc_trig'].values*srate).astype('int')
+            chunk_time_prepost_i = int(chunk_time_prepost*srate)
 
-            #### epoch
-            oc_list_trial = (oc_list_alltrial[trial_i]['oc_trig'].values * srate).astype(int)
-
-            chunk_time_prepost_i = int(chunk_time_prepost * srate)
-
-            epoch_trial = []
+            epoch_trial_cond = []
 
             for epoch_i, epoch_trig in enumerate(oc_list_trial):
 
-                _start = epoch_trig - chunk_time_prepost_i
-                _stop = epoch_trig + chunk_time_prepost_i
+                _start, _stop = epoch_trig - chunk_time_prepost_i, epoch_trig + chunk_time_prepost_i
 
-                if (_start < 0 or data_hfa_sel.shape[-1] < _stop):
+                if _start < 0 or data_ieeg_filt_norm.shape[-1] < _stop:
                     continue
 
-                epoch_trial.append(data_hfa_sel[:, _start:_stop].reshape(chanlist.size, 1, -1))
+                else:
+                    epoch_trial_cond.append(data_ieeg_filt_norm[:,_start:_stop].reshape(chanlist.size, 1, -1))
 
-            if len(epoch_trial) == 0:
-                continue
+            epoch_trial_cond = np.concat(epoch_trial_cond, axis=1)
+            dict_data_allcond[cond].append(epoch_trial_cond)
 
-            epoch_trial = np.concatenate(epoch_trial, axis=1)
+            #### RB
+            inspi_stats_RB = respfeatures.query(f"cond == '{cond}' and trial == {trial_i} and oc_id == 0")['inspi_index'].values
 
-            hfa_cond.append(epoch_trial)
+            epoch_trial_RB = []
+            
+            for epoch_i, epoch_trig in enumerate(inspi_stats_RB):
 
-        hfa_cond = np.concatenate(hfa_cond, axis=1)
+                _start, _stop = epoch_trig - chunk_time_prepost_i, epoch_trig + chunk_time_prepost_i
 
-        #### save
-        print(f'SAVE HFA {sujet} {cond}', flush=True)
+                if _start < 0 or data_ieeg_filt_norm.shape[-1] < _stop:
+                    continue
 
-        time_vec_epoch = np.arange(-chunk_time_prepost, chunk_time_prepost, 1 / srate)
+                else:
+                    epoch_trial_RB.append(data_ieeg_filt_norm[:,_start:_stop].reshape(chanlist.size, 1, -1))
 
-        dict_xr_hfa_coords = {'chan': chanlist, 'loca': ('chan', localist['loca_modified'].values), 'epoch': np.arange(hfa_cond.shape[1]), 'time': time_vec_epoch}
+            epoch_trial_RB = np.concat(epoch_trial_RB, axis=1)
 
-        xr_hfa_export = xr.DataArray(hfa_cond, dims=("chan", "epoch", "time"), coords=dict_xr_hfa_coords)
-
-        xr_hfa_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_{cond}_HFA_erp_{ref_type}.nc"))
-
-    #### RB
-    cond = 'RB'
-
-    if os.path.exists(os.path.join(path_export_ERP, f"{sujet}_RB_HFA_erp_{ref_type}.nc")):
-        print(f'{sujet} {cond} ALREADY COMPUTED', flush=True)
-        return
-
-    else:
-
-        print(f'#### HFA PRECOMPUTE {sujet} {cond} ####', flush=True)
-
-    hfa_cond = []
-
-    respfeatures = get_respfeatures(sujet)
-
-    for trial_i, trial in enumerate(trial_list_dict[sujet]):
-
-        #### data
-        data_ieeg = data_alltrial[trial_i].sel(chan=data_alltrial[trial_i]['chan'] != 'resp')
-
-        time_vec_trial = data_ieeg['time'].values
-
-        #### HFA
-        data_hfa = []
-
-        for chan_i, chan in enumerate(chanlist):
-
-            x = data_ieeg.sel(chan=chan).data
-
-            #### detrend
-            x = scipy.signal.detrend(x, type='linear')
-
-            #### bandpass HFA
-            x = iirfilt(x, srate, lowcut=70, highcut=150)
-
-            #### Hilbert
-            x_hilbert = scipy.signal.hilbert(x)
-
-            #### HFA power
-            x_power = np.abs(x_hilbert) ** 2
-
-            data_hfa.append(x_power)
-
-        data_hfa = np.array(data_hfa)
-
-        #### rscore
-
-        _med = np.median(data_hfa, axis=1)
-
-        _mad = scipy.stats.median_abs_deviation(data_hfa, axis=1)
-
-        _mad[_mad == 0] = np.nan
-
-        data_hfa_norm = ((data_hfa - _med[:, None]) * 0.6745 / _mad[:, None])
-
-        if debug:
-
-            chan_i = 0
-
-            plt.figure(figsize=(12, 5))
-
-            plt.plot(data_hfa[chan_i], label='HFA power')
-
-            plt.plot(data_hfa_norm[chan_i], label='HFA power rscore')
-
-            plt.legend()
-            plt.show()
-
-        #### sel method
-        if norm_token == 'rscore':
-            data_hfa_sel = data_hfa_norm
-        else:
-            data_hfa_sel = data_hfa
-
-        #### inspi
-
-        inspi_starts_i_list = respfeatures.query(f"trial == {trial_i} and oc_id == 0")['inspi_index'].values
-
-        chunk_time_prepost_i = int(chunk_time_prepost * srate)
-
-        epoch_trial = []
-
-        for epoch_i, epoch_trig in enumerate(inspi_starts_i_list):
-
-            _start = epoch_trig - chunk_time_prepost_i
-            _stop = epoch_trig + chunk_time_prepost_i
-
-            if (_start < 0 or data_hfa_sel.shape[-1] < _stop):
-                continue
-
-            epoch_trial.append(data_hfa_sel[:, _start:_stop].reshape(chanlist.size, 1, -1))
-
-        if len(epoch_trial) == 0:
-            continue
-
-        epoch_trial = np.concatenate(epoch_trial, axis=1)
-
-        hfa_cond.append(epoch_trial)
-
-    hfa_cond = np.concatenate(hfa_cond, axis=1)
-
+            dict_data_allcond['RB'].append(epoch_trial_RB)
+            
     #### save
+    for cond in conditions:
 
-    print(f'SAVE HFA {sujet} {cond}', flush=True)
+        time_vec_epoch = np.arange(-chunk_time_prepost, chunk_time_prepost, 1/srate)
+        data_concat = np.concat(dict_data_allcond[cond], axis=1)
+        dict_xr_erp_coords = {'chan' : chanlist, 'loca' : ('chan', localist['loca_modified'].values), 'epoch' : np.arange(data_concat.shape[1]), 'time' : time_vec_epoch} 
+        xr_erp_export = xr.DataArray(data_concat, dims=("chan", "epoch", "time"), coords=dict_xr_erp_coords)
 
-    time_vec_epoch = np.arange(-chunk_time_prepost, chunk_time_prepost, 1 / srate)
-
-    dict_xr_hfa_coords = {'chan': chanlist, 'loca': ('chan', localist['loca_modified'].values), 'epoch': np.arange(hfa_cond.shape[1]), 'time': time_vec_epoch}
-
-    xr_hfa_export = xr.DataArray(hfa_cond, dims=("chan", "epoch", "time"), coords=dict_xr_hfa_coords)
-
-    xr_hfa_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_RB_HFA_erp_{ref_type}.nc"))
+        xr_erp_export.to_netcdf(os.path.join(path_export_ERP, f"{sujet}_{cond}_HFA_erp_{ref_type}.nc"))
 
 
 
@@ -435,11 +270,11 @@ def epoch_ERP_HFA(sujet, ref_type, norm_token=None):
 def get_perm_stats_wb(sujet, ref_type):
 
     ######## VERIFY COMPUTATION ########
-    if os.path.exists(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_WB_{ref_type}.nc")):
+    if os.path.exists(os.path.join(path_precompute, 'ERP', f"{sujet}_perm_stats_WB_{ref_type}.nc")):
         return
 
     ######## CONFIG ########
-    path_load_ERP = os.path.join(path_precompute, 'ERP', sujet)
+    path_load_ERP = os.path.join(path_precompute, 'ERP')
 
     chanlist, localist = get_chanlocalist(sujet, ref_type)
     conditions_sel = conditions_oc
@@ -479,7 +314,7 @@ def get_perm_stats_wb(sujet, ref_type):
     ######## SAVE ########
     xr_coords = {'cond' : conditions_sel, 'chan' : chanlist, 'time' : time_vec}
     xr_cluster_based_perm = xr.DataArray(data=xr_data, dims=xr_coords.keys(), coords=xr_coords.values())
-    xr_cluster_based_perm.to_netcdf(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_WB_{ref_type}.nc"))
+    xr_cluster_based_perm.to_netcdf(os.path.join(path_precompute, 'ERP', f"{sujet}_perm_stats_WB_{ref_type}.nc"))
 
     os.chdir(path_memmap)
     try:
@@ -495,11 +330,11 @@ def get_perm_stats_wb(sujet, ref_type):
 def get_perm_stats_HFA(sujet, ref_type):
 
     ######## VERIFY COMPUTATION ########
-    if os.path.exists(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_HFA_{ref_type}.nc")):
+    if os.path.exists(os.path.join(path_precompute, 'ERP', f"{sujet}_perm_stats_HFA_{ref_type}.nc")):
         return
 
     ######## CONFIG ########
-    path_load_ERP = os.path.join(path_precompute, 'ERP', sujet)
+    path_load_ERP = os.path.join(path_precompute, 'ERP')
 
     chanlist, localist = get_chanlocalist(sujet, ref_type)
     conditions_sel = conditions_oc
@@ -539,7 +374,7 @@ def get_perm_stats_HFA(sujet, ref_type):
     ######## SAVE ########
     xr_coords = {'cond' : conditions_sel, 'chan' : chanlist, 'time' : time_vec}
     xr_cluster_based_perm = xr.DataArray(data=xr_data, dims=xr_coords.keys(), coords=xr_coords.values())
-    xr_cluster_based_perm.to_netcdf(os.path.join(path_precompute, 'ERP', sujet, f"{sujet}_perm_stats_HFA_{ref_type}.nc"))
+    xr_cluster_based_perm.to_netcdf(os.path.join(path_precompute, 'ERP', f"{sujet}_perm_stats_HFA_{ref_type}.nc"))
 
     os.chdir(path_memmap)
     try:
@@ -562,11 +397,11 @@ def get_perm_stats_HFA(sujet, ref_type):
 
 if __name__ == '__main__':
 
-    #sujet = sujet_list[3]
-    for sujet in sujet_list:
+    #ref_type = 'mn'
+    for ref_type in ref_type_list:
 
-        #ref_type = 'bi'
-        for ref_type in ref_type_list:
+        #sujet = sujet_list[3]
+        for sujet in sujet_list:
 
             print(f'#### {sujet} ####', flush=True)
             print(f'COMPUTE', flush=True)
